@@ -17,8 +17,10 @@ app.use meshbluHealthcheck()
 app.use bodyParser.urlencoded limit: '50mb', extended : true
 app.use bodyParser.json limit : '50mb'
 
-app.post '/message', canary.message
+# app.post '/message', canary.message
 app.get '/status', canary.status
+
+canary.startFlows()
 
 server = app.listen PORT, ->
   host = server.address().address

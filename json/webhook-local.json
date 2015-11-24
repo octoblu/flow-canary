@@ -6,5 +6,7 @@
         "method": "POST"
       }
     ]
-  }
+  },
+  "receiveWhitelist": ["*"],
+  "sendWhitelist": ["*"]
 }
