@@ -1,0 +1,10 @@
+{
+  "meshblu": {
+    "messageHooks": [
+      {
+        "url": "http://localhost:9696/message",
+        "method": "POST"
+      }
+    ]
+  }
+}

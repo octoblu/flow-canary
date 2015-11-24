@@ -1,0 +1,31 @@
+{
+  "name": "octoblu-flow-canary",
+  "version": "1.0.0",
+  "description": "Canary service for Octoblu flows",
+  "main": "octoblu-flow-canary.js",
+  "scripts": {
+    "start": "node octoblu-flow-canary.js",
+    "test": "istanbul cover _mocha -- -R spec --require coffee-coverage/register-istanbul"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/octoblu/octoblu-flow-canary.git"
+  },
+  "author": "Octoblu Inc",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/octoblu/octoblu-flow-canary/issues"
+  },
+  "homepage": "https://github.com/octoblu/octoblu-flow-canary#readme",
+  "dependencies": {
+    "body-parser": "^1.14.1",
+    "cors": "^2.7.1"
+  },
+  "devDependencies": {
+    "chai": "^3.4.1",
+    "coffee-coverage": "^0.7.0",
+    "shmock": "^0.7.2",
+    "sinon": "^1.17.2",
+    "sinon-chai": "^2.8.0"
+  }
+}
