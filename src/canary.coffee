@@ -24,30 +24,27 @@ class Canary
     url = "#{owner.apiHost}#{path}"
     debug "getting octoblu url #{url}"
     request {method,url,@jar}, (error, response, body) =>
-      debug 'get flows response:', response.statusCode
+      debug 'request response:', response.statusCode
       callback body
+
+  curryStartFlow: (flow) =>
+    return (callback) =>
+      # FIXME:
+      #  Q: Remove the delay - why is it needed?
+      #  A: Nanocyte-flow-deploy-service wants love.
+      debug 'starting', flow.name
+      _.delay =>
+        @requestOctobluUrl 'POST', "/api/flows/#{flow.flowId}/instance", (result) =>
+          debug 'started', flow.name, 'result:', result
+          callback()
+      , 5000
 
   startFlows: () =>
     @requestOctobluUrl 'GET', '/api/flows', (result) =>
+      flowStarters = []
       flows = JSON.parse result
-      stoppedFlows = _.filter flows, (flow) =>
-        return !flow.activated
-
-      startFlowFunction = (flow) =>
-        debug 'starting', flow.name
-        return (callback) =>
-          @requestOctobluUrl 'POST', "/api/flows/#{flow.flowId}/instance", (result) =>
-            debug 'started', flow.name, 'result:', result
-            callback()
-
-      flowsToStart = []
-
-      _.each stoppedFlows, (flow) =>
-        flowsToStart.push startFlowFunction(flow)
-
-      async.series flowsToStart, =>
-        debug 'all flows started'
-
-      debug 'done starting flows'
+      stoppedFlows = _.filter flows, (flow) => return !flow.activated
+      _.each stoppedFlows, (flow) => flowStarters.push @curryStartFlow(flow)
+      async.series flowStarters, => debug 'all flows started'
 
 module.exports = Canary
