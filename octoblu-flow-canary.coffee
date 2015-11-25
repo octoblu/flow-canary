@@ -5,6 +5,7 @@ express = require 'express'
 bodyParser = require 'body-parser'
 errorHandler = require 'errorhandler'
 meshbluHealthcheck = require 'express-meshblu-healthcheck'
+debug = (require 'debug')('octoblu-flow-canary:express')
 
 canary = new Canary
 PORT = process.env.PORT ? 80
@@ -20,10 +21,10 @@ app.use bodyParser.json limit : '50mb'
 app.post '/message', canary.message
 app.get '/status', canary.status
 
+canary.getTriggers()
 canary.startFlows()
 
 server = app.listen PORT, ->
   host = server.address().address
   port = server.address().port
-
-  console.log "Server running on #{host}:#{port}"
+  debug "Server running on #{host}:#{port}"
