@@ -1,17 +1,27 @@
 _ = require 'lodash'
 async = require 'async'
-owner = require '../json/owner-local.json'
 request = require 'request'
 debug = (require 'debug')('octoblu-flow-canary:canary')
 
 class Canary
 
   constructor: ({@meshbluConfig}={})->
-    owner.apiHost ?= 'https://app.octoblu.com'
-    owner.triggerHost ?= 'https://triggers.octoblu.com'
+    @OCTOBLU_CANARY_UUID = process.env.OCTOBLU_CANARY_UUID
+    @OCTOBLU_CANARY_TOKEN = process.env.OCTOBLU_CANARY_TOKEN
+    @OCTOBLU_API_HOST = process.env.OCTOBLU_API_HOST or 'https://app.octoblu.com'
+    @OCTOBLU_TRIGGER_HOST = process.env.OCTOBLU_TRIGGER_HOST or 'https://triggers.octoblu.com'
+
+    # console.log 'OCTOBLU_CANARY_UUID:', @OCTOBLU_CANARY_UUID
+    # console.log 'OCTOBLU_CANARY_TOKEN:', @OCTOBLU_CANARY_TOKEN
+    # console.log 'OCTOBLU_API_HOST:', @OCTOBLU_API_HOST
+    # console.log 'OCTOBLU_TRIGGER_HOST:', @OCTOBLU_TRIGGER_HOST
+
+    unless @OCTOBLU_CANARY_UUID and @OCTOBLU_CANARY_TOKEN
+      throw new Error 'Canary UUID or token not defined'
+
     @jar = request.jar()
-    @jar.setCookie request.cookie("meshblu_auth_uuid=#{owner.uuid}"), owner.apiHost
-    @jar.setCookie request.cookie("meshblu_auth_token=#{owner.token}"), owner.apiHost
+    @jar.setCookie request.cookie("meshblu_auth_uuid=#{@OCTOBLU_CANARY_UUID}"), @OCTOBLU_API_HOST
+    @jar.setCookie request.cookie("meshblu_auth_token=#{@OCTOBLU_CANARY_TOKEN}"), @OCTOBLU_API_HOST
     @stats = {flows:{}}
     setInterval @cleanupFlowStats, 1000*60
     setInterval @restartFailedFlows, 1000*60*5
@@ -45,7 +55,6 @@ class Canary
     @getActiveTriggers (error, triggers) =>
       return console.error error if error?
       _.each triggers, (trigger) =>
-        debug "posting to trigger trigger #{trigger.flowId}/#{trigger.triggerId}"
         flowInfo = @stats.flows[trigger.flowId] ?= {}
         triggerInfo = flowInfo.triggerTime ?= {}
         triggerTime = triggerInfo[trigger.triggerId] ?= []
@@ -81,17 +90,19 @@ class Canary
     res.end(JSON.stringify @getCurrentStats().passing)
 
   requestOctobluUrl: (method, path, callback) =>
-    url = "#{owner.apiHost}#{path}"
+    url = "#{@OCTOBLU_API_HOST}#{path}"
     debug "getting octoblu url #{url}"
     request {method,url,@jar}, (error, response, body) =>
       debug 'api response:', response.statusCode
+      throw new Error "octoblu api error (code #{response.statusCode})" if response.statusCode >= 400
       callback error, body
 
   postTriggerService: (trigger, callback=->) =>
-    url = "#{owner.triggerHost}/flows/#{trigger.flowId}/triggers/#{trigger.triggerId}"
+    url = "#{@OCTOBLU_TRIGGER_HOST}/flows/#{trigger.flowId}/triggers/#{trigger.triggerId}"
     debug "posting to trigger url #{url}"
     request {method:'POST',url}, (error, response, body) =>
       debug 'trigger response:', response.statusCode
+      throw new Error "trigger error (code #{response.statusCode})" if response.statusCode >= 400
       callback error, body
 
   curryStartFlow: (flow) =>
@@ -104,20 +115,21 @@ class Canary
         @requestOctobluUrl 'POST', "/api/flows/#{flow.flowId}/instance", (error, body) =>
           debug "started #{flow.flowId}(#{flow.name}) body: #{body}"
           callback()
-      , 5000
+      , 3000
 
-  startFlows: (callback=->) =>
+  startAllFlows: (callback=->) =>
     @getFlows (error, flows) =>
+      return callback error if error?
       flowStarters = []
-      stoppedFlows = _.filter flows, (flow) => return !flow.activated
-      _.each stoppedFlows, (flow) => flowStarters.push @curryStartFlow(flow)
+      _.each flows, (flow) => flowStarters.push @curryStartFlow(flow)
       async.series flowStarters, =>
         debug 'all flows started'
         callback()
 
   getFlows: (callback) =>
     @requestOctobluUrl 'GET', '/api/flows', (error, body) =>
-      callback error if error?
+      return callback error if error?
+      return callback new Error 'body is undefined' unless body
       flows = JSON.parse body
       _.each flows, (flow) =>
         @stats.flows[flow.flowId] ?= {}
@@ -125,7 +137,7 @@ class Canary
 
   getActiveTriggers: (callback=->) =>
     @getFlows (error, flows) =>
-      callback error if error?
+      return callback error if error?
       triggers = []
       _.each flows, (flow) =>
         triggerNodes = _.filter flow.nodes, (node) => return node.type == 'operation:trigger'

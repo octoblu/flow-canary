@@ -22,9 +22,13 @@ app.post '/message', canary.postMessage
 app.get '/passing', canary.getPassing
 app.get '/stats', canary.getStats
 
-canary.startFlows()
+startServer = (callback=->) =>
+  server = app.listen PORT, ->
+    host = server.address().address
+    port = server.address().port
+    debug "Server running on #{host}:#{port}"
+    callback()
 
-server = app.listen PORT, ->
-  host = server.address().address
-  port = server.address().port
-  debug "Server running on #{host}:#{port}"
+canary.startAllFlows =>
+  startServer =>
+    canary.postTriggers()
