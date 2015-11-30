@@ -1,5 +1,6 @@
 shmock = require 'shmock'
 Canary = require '../src/canary'
+_ = require 'lodash'
 
 API_HOST_PORT     = 0xdead
 TRIGGER_HOST_PORT = 0xbeef
@@ -80,26 +81,35 @@ describe 'Canary', ->
         expect(@startFlowB.isDone).to.be.true
         expect(@startFlowC.isDone).to.be.true
 
-      it 'should have a failing state after messaging one flow', ->
-        @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
-        expect(@sut.getCurrentStats().passing).to.equal false
-
-      it 'should have a failing state after messaging two flows', ->
-        @sut.postMessage {body:fromUuid:'flow-b'}, {end:=>}
-        expect(@sut.getCurrentStats().passing).to.equal false
-
-      it 'should have a passing state after messaging all flows', ->
-        @sut.postMessage {body:fromUuid:'flow-c'}, {end:=>}
+      it 'should be in a passing state', ->
         expect(@sut.getCurrentStats().passing).to.equal true
 
-      describe 'when postTriggers is called', ->
-        before (done) ->
-          @getFlows = @apiHost.get('/api/flows').reply(200, @flows)
-          @triggerAPost = @triggerHost.post('/flows/flow-a/triggers/trigger-flow-a').reply(201)
-          @triggerBPost = @triggerHost.post('/flows/flow-b/triggers/trigger-flow-b').reply(201)
-          @sut.postTriggers done
+    describe 'when one of the flows hasn\'t been messaged in awhile', ->
+      before ->
+        resetFlowTime = (name, time) =>
+          @sut.stats.flows[name] = {messageTime:[time]}
+        resetFlowTime 'flow-a', 0
 
-        it 'should have fetched flows and posted to both triggers', ->
-          expect(@getFlows.isDone).to.be.true
-          expect(@triggerAPost.isDone).to.be.true
-          expect(@triggerBPost.isDone).to.be.true
+      it 'should be in a failing state', ->
+        expect(@sut.getCurrentStats().passing).to.equal false
+
+      describe 'and we message it a bunch', ->
+        before ->
+          messageCanary = =>
+            @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
+          _.times 20, messageCanary
+
+        it 'should be in a passing state', ->
+          expect(@sut.getCurrentStats().passing).to.equal true
+
+    describe 'when postTriggers is called', ->
+      before (done) ->
+        @getFlows = @apiHost.get('/api/flows').reply(200, @flows)
+        @triggerAPost = @triggerHost.post('/flows/flow-a/triggers/trigger-flow-a').reply(201)
+        @triggerBPost = @triggerHost.post('/flows/flow-b/triggers/trigger-flow-b').reply(201)
+        @sut.postTriggers done
+
+      it 'should have fetched flows and posted to both triggers', ->
+        expect(@getFlows.isDone).to.be.true
+        expect(@triggerAPost.isDone).to.be.true
+        expect(@triggerBPost.isDone).to.be.true

@@ -1,0 +1,14 @@
+{
+  "meshblu": {
+    "messageHooks": [
+      {
+        "url": "http://canary.octoblu.com/message",
+        "method": "POST"
+      }
+    ]
+  },
+  "receiveWhitelist": ["*"],
+  "sendWhitelist": ["*"],
+  "owner": "a4228d8c-6cd1-482e-9287-004f22179be3",
+  "online": true
+}
