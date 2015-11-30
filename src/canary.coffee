@@ -6,10 +6,18 @@ debug = (require 'debug')('octoblu-flow-canary:canary')
 class Canary
 
   constructor: ({@meshbluConfig}={})->
-    @OCTOBLU_CANARY_UUID = process.env.OCTOBLU_CANARY_UUID
+
+    @OCTOBLU_CANARY_UUID  = process.env.OCTOBLU_CANARY_UUID
     @OCTOBLU_CANARY_TOKEN = process.env.OCTOBLU_CANARY_TOKEN
-    @OCTOBLU_API_HOST = process.env.OCTOBLU_API_HOST or 'https://app.octoblu.com'
+    @OCTOBLU_API_HOST     = process.env.OCTOBLU_API_HOST     or 'https://app.octoblu.com'
     @OCTOBLU_TRIGGER_HOST = process.env.OCTOBLU_TRIGGER_HOST or 'https://triggers.octoblu.com'
+
+    @CANARY_STATS_CLEANUP_INTERVAL = process.env.CANARY_STATS_CLEANUP_INTERVAL or 1000*60
+    @CANARY_RESTART_FLOWS_INTERVAL = process.env.CANARY_RESTART_FLOWS_INTERVAL or 1000*60*5
+    @CANARY_RESTART_FLOWS_MAX_TIME = process.env.CANARY_RESTART_FLOWS_MAX_TIME or 1000*60*3
+    @CANARY_POST_TRIGGERS_INTERVAL = process.env.CANARY_POST_TRIGGERS_INTERVAL or 1000*60
+    @CANARY_HEALTH_CHECK_MAX_TIME  = process.env.CANARY_HEALTH_CHECK_MAX_TIME  or 1000*90
+    @CANARY_HISTORY_SIZE           = process.env.CANARY_HISTORY_SIZE           or 10
 
     # console.log 'OCTOBLU_CANARY_UUID:', @OCTOBLU_CANARY_UUID
     # console.log 'OCTOBLU_CANARY_TOKEN:', @OCTOBLU_CANARY_TOKEN
@@ -23,9 +31,10 @@ class Canary
     @jar.setCookie request.cookie("meshblu_auth_uuid=#{@OCTOBLU_CANARY_UUID}"), @OCTOBLU_API_HOST
     @jar.setCookie request.cookie("meshblu_auth_token=#{@OCTOBLU_CANARY_TOKEN}"), @OCTOBLU_API_HOST
     @stats = {flows:{}}
-    setInterval @cleanupFlowStats, 1000*60
-    setInterval @restartFailedFlows, 1000*60*5
-    setInterval @postTriggers, 1000*60
+
+    setInterval @cleanupFlowStats,   @CANARY_STATS_CLEANUP_INTERVAL
+    setInterval @restartFailedFlows, @CANARY_RESTART_FLOWS_INTERVAL
+    setInterval @postTriggers,       @CANARY_POST_TRIGGERS_INTERVAL
 
   cleanupFlowStats: =>
     debug 'cleaning up flow stats'
@@ -45,22 +54,23 @@ class Canary
     flowStarters = []
     _.each _.keys(stats.flows), (flowUuid) =>
       flowInfo = stats.flows[flowUuid]
-      if !flowInfo.passing
+      if flowInfo.currentTimeDiff > @CANARY_RESTART_FLOWS_MAX_TIME
         debug "restarting failed flow #{flowUuid}"
         flowStarters.push @curryStartFlow {flowId:flowUuid}
     async.series flowStarters
 
-  postTriggers: =>
+  postTriggers: (callback=->) =>
     debug 'posting triggers'
     @getActiveTriggers (error, triggers) =>
       return console.error error if error?
-      _.each triggers, (trigger) =>
+      async.each triggers, (trigger, callback) =>
         flowInfo = @stats.flows[trigger.flowId] ?= {}
         triggerInfo = flowInfo.triggerTime ?= {}
         triggerTime = triggerInfo[trigger.triggerId] ?= []
         triggerTime.unshift Date.now()
-        triggerInfo[trigger.triggerId] = triggerTime.slice(0,10)
-        @postTriggerService trigger
+        triggerInfo[trigger.triggerId] = triggerTime.slice(0,@CANARY_HISTORY_SIZE)
+        @postTriggerService trigger, callback
+      , callback
 
   postMessage: (req, res) =>
     res.end()
@@ -68,14 +78,20 @@ class Canary
     flowInfo = @stats.flows[fromUuid] ?= {}
     flowInfo.messageTime ?= []
     flowInfo.messageTime.unshift Date.now()
-    flowInfo.messageTime = flowInfo.messageTime.slice(0,10)
+    flowInfo.messageTime = flowInfo.messageTime.slice(0,@CANARY_HISTORY_SIZE)
+    flowInfo.timeDiffs ?= []
+    if flowInfo.messageTime.length > 1
+      flowInfo.timeDiffs.unshift flowInfo.messageTime[0] - flowInfo.messageTime[1]
+    flowInfo.timeDiffs = flowInfo.timeDiffs.slice(0,@CANARY_HISTORY_SIZE)
 
   getCurrentStats: =>
     _.each @stats.flows, (flowInfo) =>
       flowInfo.passing = false
       return unless flowInfo.messageTime
-      flowInfo.timeDiff = Date.now() - flowInfo.messageTime[0]
-      flowInfo.passing = true if flowInfo.timeDiff < 1000 * 90
+      flowInfo.currentTimeDiff = Date.now() - flowInfo.messageTime[0]
+      flowInfo.passing = true if flowInfo.currentTimeDiff < @CANARY_HEALTH_CHECK_MAX_TIME
+      _.each flowInfo.timeDiffs, (timeDiff) =>
+        flowInfo.passing = false if timeDiff >= @CANARY_HEALTH_CHECK_MAX_TIME
 
     @stats.passing = _.keys(@stats.flows).length != 0
     _.each @stats.flows, (flowInfo) =>
@@ -94,7 +110,9 @@ class Canary
     debug "getting octoblu url #{url}"
     request {method,url,@jar}, (error, response, body) =>
       debug 'api response:', response.statusCode
-      throw new Error "octoblu api error (code #{response.statusCode})" if response.statusCode >= 400
+      if response.statusCode >= 400
+        console.error "octoblu api error (code #{response.statusCode})"
+        return callback()
       callback error, body
 
   postTriggerService: (trigger, callback=->) =>
@@ -102,7 +120,9 @@ class Canary
     debug "posting to trigger url #{url}"
     request {method:'POST',url}, (error, response, body) =>
       debug 'trigger response:', response.statusCode
-      throw new Error "trigger error (code #{response.statusCode})" if response.statusCode >= 400
+      if response.statusCode >= 400
+        console.error "trigger error (code #{response.statusCode})"
+        return callback()
       callback error, body
 
   curryStartFlow: (flow) =>
