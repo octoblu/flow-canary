@@ -1,6 +1,6 @@
 {
-  "name": "octoblu-flow-canary",
-  "version": "1.0.2",
+  "name": "flow-canary",
+  "version": "1.0.3",
   "description": "Canary service for Octoblu flows",
   "main": "octoblu-flow-canary.js",
   "scripts": {
@@ -9,14 +9,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/octoblu/octoblu-flow-canary.git"
+    "url": "git+https://github.com/octoblu/flow-canary.git"
   },
   "author": "Octoblu Inc",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/octoblu/octoblu-flow-canary/issues"
+    "url": "https://github.com/octoblu/flow-canary/issues"
   },
-  "homepage": "https://github.com/octoblu/octoblu-flow-canary#readme",
+  "homepage": "https://github.com/octoblu/flow-canary#readme",
   "dependencies": {
     "async": "^1.5.0",
     "body-parser": "^1.14.1",
