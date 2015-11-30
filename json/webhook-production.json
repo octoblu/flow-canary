@@ -10,5 +10,6 @@
   "receiveWhitelist": ["*"],
   "sendWhitelist": ["*"],
   "owner": "a4228d8c-6cd1-482e-9287-004f22179be3",
-  "online": true
+  "online": true,
+  "type": "device:generic"
 }
