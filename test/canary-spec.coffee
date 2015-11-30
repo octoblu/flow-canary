@@ -57,7 +57,7 @@ describe 'Canary', ->
     it 'should have a passing endpoint', ->
       expect(@sut.getPassing).to.exist
 
-    it 'should have a pstTriggers function', ->
+    it 'should have a postTriggers function', ->
       expect(@sut.postTriggers).to.exist
 
     it 'should have a function for getting current stats', ->
