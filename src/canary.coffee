@@ -62,7 +62,7 @@ class Canary
   postTriggers: (callback=->) =>
     debug 'posting triggers'
     @getActiveTriggers (error, triggers) =>
-      return console.error error if error?
+      return callback error if error?
       async.each triggers, (trigger, callback) =>
         flowInfo = @stats.flows[trigger.flowId] ?= {}
         triggerInfo = flowInfo.triggerTime ?= {}
