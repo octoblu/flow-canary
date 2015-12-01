@@ -63,6 +63,10 @@ class Canary
         delete @stats.flows[flowUuid]
 
   getCurrentStats: =>
+    @updateStats()
+    return @stats
+
+  updateStats: =>
     _.each @stats.flows, (flowInfo) =>
       flowInfo.passing = false
       return unless flowInfo.messageTime
@@ -74,8 +78,6 @@ class Canary
     @stats.passing = _.keys(@stats.flows).length != 0
     _.each @stats.flows, (flowInfo) =>
       @stats.passing = false if !flowInfo.passing
-
-    return @stats
 
   getFlows: (callback) =>
     @requestOctobluUrl 'GET', '/api/flows', (error, body) =>
@@ -98,10 +100,10 @@ class Canary
 
   restartFailedFlows: (callback=->) =>
     debug 'restarting failed flows'
-    stats = @getCurrentStats()
+    @updateStats()
     flowStarters = []
-    _.each _.keys(stats.flows), (flowUuid) =>
-      flowInfo = stats.flows[flowUuid]
+    _.each _.keys(@stats.flows), (flowUuid) =>
+      flowInfo = @stats.flows[flowUuid]
       if flowInfo.currentTimeDiff > @CANARY_RESTART_FLOWS_MAX_TIME
         debug "restarting failed flow #{flowUuid}"
         flowStarters.push @curryStartFlow flowUuid
@@ -109,8 +111,7 @@ class Canary
 
   postTriggers: (callback=->) =>
     debug 'posting triggers'
-    triggers = @getTriggers()
-    async.each triggers, (trigger, callback) =>
+    async.each @getTriggers(), (trigger, callback) =>
       flowInfo = @stats.flows[trigger.flowId] ?= {}
       triggerInfo = flowInfo.triggerTime ?= {}
       triggerTime = triggerInfo[trigger.triggerId] ?= []
