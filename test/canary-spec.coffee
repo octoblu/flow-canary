@@ -152,5 +152,4 @@ describe 'Canary', ->
         expect(@triggerBPost.isDone).to.be.true
 
       it 'should have errors in stats', ->
-        console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
         expect(@sut.canary.getCurrentStats().errors?.length).to.equal 4
