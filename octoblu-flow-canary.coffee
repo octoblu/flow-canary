@@ -1,13 +1,13 @@
 cors = require 'cors'
 morgan = require 'morgan'
-Canary = require './src/canary'
+CanaryMessageController = require './src/canary-message-controller'
 express = require 'express'
 bodyParser = require 'body-parser'
 errorHandler = require 'errorhandler'
 meshbluHealthcheck = require 'express-meshblu-healthcheck'
 debug = (require 'debug')('octoblu-flow-canary:express')
 
-canary = new Canary
+cage = new CanaryMessageController
 PORT = process.env.PORT ? 80
 
 app = express()
@@ -18,9 +18,9 @@ app.use meshbluHealthcheck()
 app.use bodyParser.urlencoded limit: '50mb', extended : true
 app.use bodyParser.json limit : '50mb'
 
-app.post '/message', canary.postMessage
-app.get '/passing', canary.getPassing
-app.get '/stats', canary.getStats
+app.post '/message', cage.postMessage
+app.get '/passing', cage.getPassing
+app.get '/stats', cage.getStats
 
 startServer = (callback=->) =>
   server = app.listen PORT, ->
@@ -29,6 +29,6 @@ startServer = (callback=->) =>
     debug "Server running on #{host}:#{port}"
     callback()
 
-canary.startAllFlows =>
+cage.canary.startAllFlows =>
   startServer =>
-    canary.postTriggers()
+    cage.canary.postTriggers()
