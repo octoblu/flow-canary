@@ -30,7 +30,9 @@ class Canary
     @jar = request.jar()
     @jar.setCookie request.cookie("meshblu_auth_uuid=#{@OCTOBLU_CANARY_UUID}"), @OCTOBLU_API_HOST
     @jar.setCookie request.cookie("meshblu_auth_token=#{@OCTOBLU_CANARY_TOKEN}"), @OCTOBLU_API_HOST
-    @stats = {flows:{}}
+    @stats =
+      flows: {}
+      startTime: Date.now()
 
     setInterval @cleanupFlowStats,   @CANARY_STATS_CLEANUP_INTERVAL
     setInterval @restartFailedFlows, @CANARY_RESTART_FLOWS_INTERVAL
@@ -55,8 +57,8 @@ class Canary
     _.each _.keys(stats.flows), (flowUuid) =>
       flowInfo = stats.flows[flowUuid]
       if flowInfo.currentTimeDiff > @CANARY_RESTART_FLOWS_MAX_TIME
-        debug "restarting failed flow #{flowUuid}"
-        flowStarters.push @curryStartFlow {flowId:flowUuid}
+        console.error "restarting failed flow #{flowUuid}"
+        flowStarters.push @curryStartFlow flowUuid
     async.series flowStarters
 
   postTriggers: (callback=->) =>
@@ -125,15 +127,18 @@ class Canary
         return callback()
       callback error, body
 
-  curryStartFlow: (flow) =>
+  curryStartFlow: (flowUuid) =>
     return (callback=->) =>
       # FIXME:
       #  Q: Remove the delay - why is it needed?
       #  A: Nanocyte-flow-deploy-service wants love.
-      debug "starting #{flow.flowId}(#{flow.name})"
+      debug "starting #{flowUuid}"
       _.delay =>
-        @requestOctobluUrl 'POST', "/api/flows/#{flow.flowId}/instance", (error, body) =>
-          debug "started #{flow.flowId}(#{flow.name}) body: #{body}"
+        @requestOctobluUrl 'POST', "/api/flows/#{flowUuid}/instance", (error, body) =>
+          debug "started #{flowUuid} body: #{body}"
+          flowInfo = @stats.flows[flowUuid]
+          flowInfo.startTime ?= []
+          flowInfo.startTime.unshift Date.now()
           callback()
       , 3000
 
@@ -141,7 +146,7 @@ class Canary
     @getFlows (error, flows) =>
       return callback error if error?
       flowStarters = []
-      _.each flows, (flow) => flowStarters.push @curryStartFlow(flow)
+      _.each flows, (flow) => flowStarters.push @curryStartFlow(flow.flowId)
       async.series flowStarters, =>
         debug 'all flows started'
         callback()
