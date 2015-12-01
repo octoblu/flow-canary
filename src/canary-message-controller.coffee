@@ -9,7 +9,7 @@ class CanaryMessageController
     res.json(@canary.getCurrentStats()).end()
 
   getPassing: (req, res) =>
-    res.end(JSON.stringify @canary.getCurrentStats().passing)
+    res.json(@canary.getPassing()).end()
 
   postMessage: (req, res) =>
     res.end()

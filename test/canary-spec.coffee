@@ -67,7 +67,7 @@ describe 'Canary', ->
       expect(@sut.canary.getCurrentStats).to.exist
 
     it 'should have an initial failing state', ->
-      expect(@sut.canary.getCurrentStats().passing).to.equal false
+      expect(@sut.canary.getPassing().passing).to.equal false
 
     describe 'when startAllFlows is called', ->
       before (done) ->
@@ -84,14 +84,14 @@ describe 'Canary', ->
         expect(@startFlowC.isDone).to.be.true
 
       it 'should be in a passing state', ->
-        expect(@sut.canary.getCurrentStats().passing).to.equal true
+        expect(@sut.canary.getPassing().passing).to.equal true
 
     describe 'when one of the flows hasn\'t been messaged in awhile', ->
       before ->
         @resetFlowTime 'flow-a', 0
 
       it 'should be in a failing state', ->
-        expect(@sut.canary.getCurrentStats().passing).to.equal false
+        expect(@sut.canary.getPassing().passing).to.equal false
 
       describe 'and we message it a bunch', ->
         before ->
@@ -100,7 +100,7 @@ describe 'Canary', ->
           _.times 20, messageCanary
 
         it 'should be in a passing state', ->
-          expect(@sut.canary.getCurrentStats().passing).to.equal true
+          expect(@sut.canary.getPassing().passing).to.equal true
 
     describe 'when postTriggers is called', ->
       before (done) ->
@@ -117,7 +117,7 @@ describe 'Canary', ->
         @resetFlowTime 'flow-c', 0
 
       it 'should be in a failing state', ->
-        expect(@sut.canary.getCurrentStats().passing).to.equal false
+        expect(@sut.canary.getPassing().passing).to.equal false
 
       describe 'when processUpdateInterval is called', ->
         before (done) ->
@@ -132,3 +132,25 @@ describe 'Canary', ->
           expect(@startFlowC.isDone).to.be.true
           expect(@triggerAPost.isDone).to.be.true
           expect(@triggerBPost.isDone).to.be.true
+
+        it 'should have no errors in stats', ->
+          expect(@sut.canary.getCurrentStats().errors).to.not.exist
+
+    describe 'when processUpdateInterval and everything errors', ->
+      before (done) ->
+        @resetFlowTime 'flow-c', 0
+        @getFlows = @apiHost.get('/api/flows').reply(401, @flows)
+        @startFlowC = @apiHost.post('/api/flows/flow-c/instance').reply(401)
+        @triggerAPost = @triggerHost.post('/flows/flow-a/triggers/trigger-flow-a').reply(401)
+        @triggerBPost = @triggerHost.post('/flows/flow-b/triggers/trigger-flow-b').reply(401)
+        @sut.canary.processUpdateInterval done
+
+      it 'should have tried to fetch the flows, restart the failed flow, and post to triggers', ->
+        expect(@getFlows.isDone).to.be.true
+        expect(@startFlowC.isDone).to.be.true
+        expect(@triggerAPost.isDone).to.be.true
+        expect(@triggerBPost.isDone).to.be.true
+
+      it 'should have errors in stats', ->
+        console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
+        expect(@sut.canary.getCurrentStats().errors?.length).to.equal 4

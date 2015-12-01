@@ -26,7 +26,8 @@ class Canary
       flows: {}
       startTime: Date.now()
     @flows = []
-    setInterval @processUpdateInterval,   @CANARY_UPDATE_INTERVAL
+
+    setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
 
   processUpdateInterval: (callback=->) =>
     @getFlows =>
@@ -38,11 +39,11 @@ class Canary
     flowInfo = @stats.flows[flowId] ?= {}
     flowInfo.messageTime ?= []
     flowInfo.messageTime.unshift Date.now()
-    flowInfo.messageTime = flowInfo.messageTime.slice(0,@CANARY_HISTORY_SIZE)
+    flowInfo.messageTime = flowInfo.messageTime.slice 0, @CANARY_HISTORY_SIZE
     flowInfo.timeDiffs ?= []
     if flowInfo.messageTime.length > 1
       flowInfo.timeDiffs.unshift flowInfo.messageTime[0] - flowInfo.messageTime[1]
-    flowInfo.timeDiffs = flowInfo.timeDiffs.slice(0,@CANARY_HISTORY_SIZE)
+    flowInfo.timeDiffs = flowInfo.timeDiffs.slice 0, @CANARY_HISTORY_SIZE
 
   startAllFlows: (callback=->) =>
     @getFlows =>
@@ -64,6 +65,11 @@ class Canary
 
   getCurrentStats: =>
     @updateStats()
+    return @stats
+
+  getPassing: =>
+    @updateStats()
+    return {passing:true} if @stats.passing
     return @stats
 
   updateStats: =>
@@ -116,8 +122,8 @@ class Canary
       triggerInfo = flowInfo.triggerTime ?= {}
       triggerTime = triggerInfo[trigger.triggerId] ?= []
       triggerTime.unshift Date.now()
-      triggerInfo[trigger.triggerId] = triggerTime.slice(0,@CANARY_HISTORY_SIZE)
-      @postTriggerService trigger, callback
+      triggerInfo[trigger.triggerId] = triggerTime.slice 0, @CANARY_HISTORY_SIZE
+      @postTriggerService trigger, => callback()
     , callback
 
   curryStartFlow: (flowUuid) =>
@@ -137,24 +143,27 @@ class Canary
           callback()
       , 3000
 
+  addError: (message) =>
+    @stats.errors ?= []
+    @stats.errors.unshift {message, time: Date.now()}
+    @stats.errors = @stats.errors.slice 0, @CANARY_HISTORY_SIZE
+
   requestOctobluUrl: (method, path, callback) =>
     url = "#{@OCTOBLU_API_HOST}#{path}"
-    debug "getting octoblu url #{url}"
-    request {method,url,@jar}, (error, response, body) =>
-      debug 'api response:', response.statusCode
-      if response.statusCode >= 400
-        debug "octoblu api error (code #{response.statusCode})"
-        return callback new Error response.statusCode
-      callback error, body
+    @sendRequest {method, url, @jar}, callback
 
   postTriggerService: (trigger, callback=->) =>
     url = "#{@OCTOBLU_TRIGGER_HOST}/flows/#{trigger.flowId}/triggers/#{trigger.triggerId}"
-    debug "posting to trigger url #{url}"
-    request {method:'POST',url}, (error, response, body) =>
-      debug 'trigger response:', response.statusCode
-      if response.statusCode >= 400
-        debug "trigger error (code #{response.statusCode})"
-        return callback new Error response.statusCode
+    @sendRequest {method:'POST', url}, callback
+
+  sendRequest: (options, callback) =>
+    debug "#{options?.method} request #{options?.url}"
+    request options, (error, response, body) =>
+      responseInfo = "[#{response?.statusCode}] #{options?.method} #{options.url}"
+      debug responseInfo
+      if error or response?.statusCode >= 400
+        @addError responseInfo
+        return callback new Error responseInfo
       callback error, body
 
 module.exports = Canary
