@@ -153,6 +153,7 @@ class Canary
       flows = JSON.parse body
       _.each flows, (flow) =>
         @stats.flows[flow.flowId] ?= {}
+        @stats.flows[flow.flowId].name = flow.name
         @stats.flows[flow.flowId].messageTime ?= [ Date.now() ]
       callback null, flows
 
