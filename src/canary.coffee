@@ -143,9 +143,9 @@ class Canary
           callback()
       , 3000
 
-  addError: (message) =>
+  addError: (url, body, error) =>
     @stats.errors ?= []
-    @stats.errors.unshift {message, time: Date.now()}
+    @stats.errors.unshift {url, body, error, time: Date.now()}
     @stats.errors = @stats.errors.slice 0, @CANARY_HISTORY_SIZE
 
   requestOctobluUrl: (method, path, callback) =>
@@ -159,11 +159,12 @@ class Canary
   sendRequest: (options, callback) =>
     debug "#{options?.method} request #{options?.url}"
     request options, (error, response, body) =>
-      responseInfo = "[#{response?.statusCode}] #{options?.method} #{options.url}"
-      debug responseInfo
-      if error or response?.statusCode >= 400
-        @addError responseInfo
-        return callback new Error responseInfo
-      callback error, body
+      body = undefined if _.isEmpty body
+      urlInfo = "[#{response?.statusCode}] #{options?.method} #{options?.url}"
+      debug urlInfo
+      if error? or response?.statusCode >= 400
+        @addError urlInfo, body, error?.message
+        return callback new Error urlInfo
+      callback null, body
 
 module.exports = Canary
