@@ -2,8 +2,8 @@ Canary = require './canary'
 
 class CanaryMessageController
 
-  constructor: ({@canary}={}) ->
-    @canary ?= new Canary
+  constructor: ({@canary,Date}={}) ->
+    @canary ?= new Canary {Date}
 
   getStats: (req, res) =>
     res.json(@canary.getCurrentStats()).end()

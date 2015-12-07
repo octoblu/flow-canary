@@ -9,17 +9,23 @@ describe 'Canary', ->
   @timeout 30000
 
   before ->
+
+    @DateMock =
+      now: => @time or 0
+      setTime: (@time) =>
+      inc: (delta) => @time += delta
+
+    @startTime = Date.now()
+    @DateMock.setTime @startTime
+
     process.env.OCTOBLU_CANARY_UUID  = 'canary_uuid'
     process.env.OCTOBLU_CANARY_TOKEN = 'canary_token'
     process.env.OCTOBLU_API_HOST     = 'http://localhost:' + API_HOST_PORT
     process.env.OCTOBLU_TRIGGER_HOST = 'http://localhost:' + TRIGGER_HOST_PORT
 
-    # process.env.CANARY_STATS_CLEANUP_INTERVAL = 1
-    # process.env.CANARY_RESTART_FLOWS_INTERVAL = 1
-    # process.env.CANARY_RESTART_FLOWS_MAX_TIME = 1
-    # process.env.CANARY_POST_TRIGGERS_INTERVAL = 1
-    # process.env.CANARY_HEALTH_CHECK_MAX_TIME  = 1
-    # process.env.CANARY_HISTORY_SIZE           = 1
+    @CANARY_RESTART_FLOWS_MAX_TIME = process.env.CANARY_RESTART_FLOWS_MAX_TIME = 1000*60
+    @CANARY_UPDATE_INTERVAL        = process.env.CANARY_UPDATE_INTERVAL        = 1000*30
+    @CANARY_HEALTH_CHECK_MAX_DIFF  = process.env.CANARY_HEALTH_CHECK_MAX_DIFF  = 100
 
     @apiHost     = shmock API_HOST_PORT
     @triggerHost = shmock TRIGGER_HOST_PORT
@@ -41,7 +47,7 @@ describe 'Canary', ->
         flowId: "flow-c"
     ]
 
-    @sut = new CanaryMessageController
+    @sut = new CanaryMessageController Date: @DateMock
 
     @resetFlowTime = (name, time) =>
       @sut.canary.stats.flows[name] = {messageTime:[time]}
@@ -75,7 +81,9 @@ describe 'Canary', ->
         @startFlowA = @apiHost.post('/api/flows/flow-a/instance').reply(201)
         @startFlowB = @apiHost.post('/api/flows/flow-b/instance').reply(201)
         @startFlowC = @apiHost.post('/api/flows/flow-c/instance').reply(201)
-        @sut.canary.startAllFlows done
+        @sut.canary.startAllFlows =>
+          @DateMock.inc @CANARY_UPDATE_INTERVAL
+          done()
 
       it 'should have fetched our flows and started them', ->
         expect(@getFlows.isDone).to.be.true
@@ -93,13 +101,17 @@ describe 'Canary', ->
       it 'should be in a failing state', ->
         expect(@sut.canary.getPassing().passing).to.equal false
 
-      describe 'and we message it a bunch', ->
+      describe 'and we message them a bunch', ->
         before ->
           messageCanary = =>
+            @DateMock.inc @CANARY_UPDATE_INTERVAL
             @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
+            @sut.postMessage {body:fromUuid:'flow-b'}, {end:=>}
+            @sut.postMessage {body:fromUuid:'flow-c'}, {end:=>}
           _.times 20, messageCanary
 
         it 'should be in a passing state', ->
+          # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
           expect(@sut.canary.getPassing().passing).to.equal true
 
     describe 'when postTriggers is called', ->
@@ -134,11 +146,13 @@ describe 'Canary', ->
           expect(@triggerBPost.isDone).to.be.true
 
         it 'should have no errors in stats', ->
+          # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
           expect(@sut.canary.getCurrentStats().errors).to.not.exist
 
     describe 'when processUpdateInterval and everything errors', ->
       before (done) ->
         @resetFlowTime 'flow-c', 0
+        delete @sut.canary.stats.errors
         @getFlows = @apiHost.get('/api/flows').reply(401, @flows)
         @startFlowC = @apiHost.post('/api/flows/flow-c/instance').reply(401)
         @triggerAPost = @triggerHost.post('/flows/flow-a/triggers/trigger-flow-a').reply(401)
@@ -154,3 +168,24 @@ describe 'Canary', ->
       it 'should have errors in stats', ->
         # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
         expect(@sut.canary.getCurrentStats().errors?.length).to.equal 4
+
+    describe 'when one of the flows is messaged too often', ->
+      before ->
+        @resetFlowTime 'flow-a', @DateMock.now()
+        @resetFlowTime 'flow-b', @DateMock.now()
+        @resetFlowTime 'flow-c', @DateMock.now()
+        delete @sut.canary.stats.errors
+
+      it 'should initialy be in a passing state', ->
+        expect(@sut.canary.getPassing().passing).to.equal true
+
+      describe 'and we message a flow once', ->
+        before ->
+          messageCanary = =>
+            @DateMock.inc @CANARY_UPDATE_INTERVAL - (@CANARY_HEALTH_CHECK_MAX_DIFF*1.1)
+            @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
+          _.times 1, messageCanary
+
+        it 'should be in a failing state', ->
+          # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
+          expect(@sut.canary.getPassing().passing).to.equal false

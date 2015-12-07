@@ -5,16 +5,19 @@ debug = (require 'debug')('octoblu-flow-canary:canary')
 
 class Canary
 
-  constructor: ->
+  constructor: ({@Date}={})->
+    @Date ?= Date
+
     @OCTOBLU_CANARY_UUID  = process.env.OCTOBLU_CANARY_UUID
     @OCTOBLU_CANARY_TOKEN = process.env.OCTOBLU_CANARY_TOKEN
     @OCTOBLU_API_HOST     = process.env.OCTOBLU_API_HOST     or 'https://app.octoblu.com'
     @OCTOBLU_TRIGGER_HOST = process.env.OCTOBLU_TRIGGER_HOST or 'https://triggers.octoblu.com'
 
-    @CANARY_UPDATE_INTERVAL        = process.env.CANARY_UPDATE_INTERVAL        or 1000*60
-    @CANARY_RESTART_FLOWS_MAX_TIME = process.env.CANARY_RESTART_FLOWS_MAX_TIME or 1000*60*5
-    @CANARY_HEALTH_CHECK_MAX_TIME  = process.env.CANARY_HEALTH_CHECK_MAX_TIME  or 1000*90
-    @CANARY_HISTORY_SIZE           = process.env.CANARY_HISTORY_SIZE           or 10
+    @CANARY_RESTART_FLOWS_MAX_TIME = new Number process.env.CANARY_RESTART_FLOWS_MAX_TIME or 1000*60*5
+    @CANARY_UPDATE_INTERVAL        = new Number process.env.CANARY_UPDATE_INTERVAL        or 1000*60
+    @CANARY_HEALTH_CHECK_MAX_DIFF  = new Number process.env.CANARY_HEALTH_CHECK_MAX_DIFF  or 1000
+    @CANARY_DATA_HISTORY_SIZE      = new Number process.env.CANARY_DATA_HISTORY_SIZE      or 5
+    @CANARY_ERROR_HISTORY_SIZE     = new Number process.env.CANARY_ERROR_HISTORY_SIZE     or 20
 
     unless @OCTOBLU_CANARY_UUID and @OCTOBLU_CANARY_TOKEN
       throw new Error 'Canary UUID or token not defined'
@@ -24,10 +27,19 @@ class Canary
     @jar.setCookie request.cookie("meshblu_auth_token=#{@OCTOBLU_CANARY_TOKEN}"), @OCTOBLU_API_HOST
     @stats =
       flows: {}
-      startTime: Date.now()
+      startTime: @Date.now()
     @flows = []
 
     setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
+
+  timeDiffGreaterThanMin: (timeDiff) =>
+    return timeDiff >= (@CANARY_UPDATE_INTERVAL - @CANARY_HEALTH_CHECK_MAX_DIFF)
+
+  timeDiffLessThanMax: (timeDiff) =>
+    return timeDiff <= (@CANARY_UPDATE_INTERVAL + @CANARY_HEALTH_CHECK_MAX_DIFF)
+
+  passingTimeDiff: (timeDiff) =>
+    return @timeDiffGreaterThanMin(timeDiff) and @timeDiffLessThanMax(timeDiff)
 
   processUpdateInterval: (callback=->) =>
     @getFlows =>
@@ -38,12 +50,18 @@ class Canary
   messageFromFlow: (flowId) =>
     flowInfo = @stats.flows[flowId] ?= {}
     flowInfo.messageTime ?= []
-    flowInfo.messageTime.unshift Date.now()
-    flowInfo.messageTime = flowInfo.messageTime.slice 0, @CANARY_HISTORY_SIZE
+    flowInfo.messageTime.unshift @Date.now()
+    flowInfo.messageTime = flowInfo.messageTime.slice 0, @CANARY_DATA_HISTORY_SIZE
     flowInfo.timeDiffs ?= []
     if flowInfo.messageTime.length > 1
       flowInfo.timeDiffs.unshift flowInfo.messageTime[0] - flowInfo.messageTime[1]
-    flowInfo.timeDiffs = flowInfo.timeDiffs.slice 0, @CANARY_HISTORY_SIZE
+    flowInfo.timeDiffs = flowInfo.timeDiffs.slice 0, @CANARY_DATA_HISTORY_SIZE
+    if flowInfo.timeDiffs[0]? and !@passingTimeDiff flowInfo.timeDiffs[0]
+      flowInfo.failures ?= []
+      flowInfo.failures.unshift
+        time: flowInfo.messageTime[0]
+        timeDiff: flowInfo.timeDiffs[0]
+      flowInfo.failures = flowInfo.failures.slice 0, @CANARY_ERROR_HISTORY_SIZE
 
   startAllFlows: (callback=->) =>
     @getFlows =>
@@ -74,12 +92,11 @@ class Canary
 
   updateStats: =>
     _.each @stats.flows, (flowInfo) =>
-      flowInfo.passing = false
-      return unless flowInfo.messageTime
-      flowInfo.currentTimeDiff = Date.now() - flowInfo.messageTime[0]
-      flowInfo.passing = true if flowInfo.currentTimeDiff < @CANARY_HEALTH_CHECK_MAX_TIME
+      lastMessage = flowInfo.messageTime?[0] or flowInfo.startTime?[0] or 0
+      flowInfo.currentTimeDiff = @Date.now() - lastMessage
+      flowInfo.passing = @timeDiffLessThanMax flowInfo.currentTimeDiff
       _.each flowInfo.timeDiffs, (timeDiff) =>
-        flowInfo.passing = false if timeDiff >= @CANARY_HEALTH_CHECK_MAX_TIME
+        flowInfo.passing = false if !@passingTimeDiff timeDiff
 
     @stats.passing = _.keys(@stats.flows).length != 0
     _.each @stats.flows, (flowInfo) =>
@@ -121,8 +138,8 @@ class Canary
       flowInfo = @stats.flows[trigger.flowId] ?= {}
       triggerInfo = flowInfo.triggerTime ?= {}
       triggerTime = triggerInfo[trigger.triggerId] ?= []
-      triggerTime.unshift Date.now()
-      triggerInfo[trigger.triggerId] = triggerTime.slice 0, @CANARY_HISTORY_SIZE
+      triggerTime.unshift @Date.now()
+      triggerInfo[trigger.triggerId] = triggerTime.slice 0, @CANARY_DATA_HISTORY_SIZE
       @postTriggerService trigger, => callback()
     , callback
 
@@ -135,18 +152,17 @@ class Canary
       _.delay =>
         @requestOctobluUrl 'POST', "/api/flows/#{flowUuid}/instance", (error, body) =>
           debug "started #{flowUuid} body: #{body}"
-          currentTime = Date.now()
           flowInfo = @stats.flows[flowUuid]
           flowInfo.startTime ?= []
-          flowInfo.startTime.unshift currentTime
-          flowInfo.messageTime ?= [ currentTime ]
+          flowInfo.startTime.unshift @Date.now()
+          flowInfo.startTime = flowInfo.startTime.slice 0, @CANARY_DATA_HISTORY_SIZE
           callback()
       , 3000
 
   addError: (url, body, error) =>
     @stats.errors ?= []
-    @stats.errors.unshift {url, body, error, time: Date.now()}
-    @stats.errors = @stats.errors.slice 0, @CANARY_HISTORY_SIZE
+    @stats.errors.unshift {url, body, error, time: @Date.now()}
+    @stats.errors = @stats.errors.slice 0, @CANARY_ERROR_HISTORY_SIZE
 
   requestOctobluUrl: (method, path, callback) =>
     url = "#{@OCTOBLU_API_HOST}#{path}"
