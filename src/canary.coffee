@@ -59,7 +59,7 @@ class Canary
     if flowInfo.timeDiffs[0]? and !@passingTimeDiff flowInfo.timeDiffs[0]
       flowInfo.failures ?= []
       flowInfo.failures.unshift
-        time: flowInfo.messageTime[0]
+        time: flowInfo.messageTime[1]
         timeDiff: flowInfo.timeDiffs[0]
       flowInfo.failures = flowInfo.failures.slice 0, @CANARY_ERROR_HISTORY_SIZE
 
