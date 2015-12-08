@@ -24,8 +24,9 @@ describe 'Canary', ->
     process.env.OCTOBLU_TRIGGER_HOST = 'http://localhost:' + TRIGGER_HOST_PORT
 
     @CANARY_RESTART_FLOWS_MAX_TIME = process.env.CANARY_RESTART_FLOWS_MAX_TIME = 1000*60
-    @CANARY_UPDATE_INTERVAL        = process.env.CANARY_UPDATE_INTERVAL        = 1000*30
+    @CANARY_UPDATE_INTERVAL        = process.env.CANARY_UPDATE_INTERVAL        = 1000*120
     @CANARY_HEALTH_CHECK_MAX_DIFF  = process.env.CANARY_HEALTH_CHECK_MAX_DIFF  = 100
+    @CANARY_DATA_HISTORY_SIZE      = process.env.CANARY_DATA_HISTORY_SIZE      = 3
 
     @apiHost     = shmock API_HOST_PORT
     @triggerHost = shmock TRIGGER_HOST_PORT
@@ -96,7 +97,7 @@ describe 'Canary', ->
 
       describe 'when one of the flows hasn\'t been messaged in awhile', ->
         before ->
-          @resetFlowTime 'flow-a', 0
+          @resetFlowTime 'flow-a', @DateMock.now() - @CANARY_UPDATE_INTERVAL*2
 
         it 'should be in a failing state', ->
           expect(@sut.canary.getPassing().passing).to.equal false
@@ -108,7 +109,7 @@ describe 'Canary', ->
               @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
               @sut.postMessage {body:fromUuid:'flow-b'}, {end:=>}
               @sut.postMessage {body:fromUuid:'flow-c'}, {end:=>}
-            _.times 20, messageCanary
+            _.times @CANARY_DATA_HISTORY_SIZE+1, messageCanary
 
           it 'should be in a passing state', ->
             # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
@@ -126,7 +127,7 @@ describe 'Canary', ->
 
       describe 'when one of the other flows hasn\'t been messaged in awhile', ->
         before ->
-          @resetFlowTime 'flow-c', 0
+          @resetFlowTime 'flow-c', @DateMock.now() - @CANARY_UPDATE_INTERVAL*2
 
         it 'should be in a failing state', ->
           expect(@sut.canary.getPassing().passing).to.equal false
@@ -151,7 +152,7 @@ describe 'Canary', ->
 
       describe 'when processUpdateInterval and everything errors', ->
         before (done) ->
-          @resetFlowTime 'flow-c', 0
+          @resetFlowTime 'flow-c', @DateMock.now() - @CANARY_UPDATE_INTERVAL*2
           @getFlows = @apiHost.get('/api/flows').reply(401, @flows)
           @startFlowC = @apiHost.post('/api/flows/flow-c/instance').reply(401)
           @triggerAPost = @triggerHost.post('/flows/flow-a/triggers/trigger-flow-a').reply(401)
@@ -180,10 +181,8 @@ describe 'Canary', ->
 
         describe 'and we message a flow once', ->
           before ->
-            messageCanary = =>
-              @DateMock.inc @CANARY_UPDATE_INTERVAL - (@CANARY_HEALTH_CHECK_MAX_DIFF*1.1)
-              @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
-            _.times 1, messageCanary
+            @DateMock.inc @CANARY_UPDATE_INTERVAL - (@CANARY_HEALTH_CHECK_MAX_DIFF*1.1)
+            @sut.postMessage {body:fromUuid:'flow-a'}, {end:=>}
 
           it 'should be in a failing state', ->
             # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2

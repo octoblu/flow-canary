@@ -47,21 +47,21 @@ class Canary
       @restartFailedFlows =>
         @postTriggers callback
 
+  unshiftData: (obj, prop, data, trimSize=@CANARY_DATA_HISTORY_SIZE) =>
+    obj[prop] ?= []
+    obj[prop].unshift data
+    obj[prop] = obj[prop].slice 0, trimSize
+
   messageFromFlow: (flowId) =>
     flowInfo = @stats.flows[flowId] ?= {}
-    flowInfo.messageTime ?= []
-    flowInfo.messageTime.unshift @Date.now()
-    flowInfo.messageTime = flowInfo.messageTime.slice 0, @CANARY_DATA_HISTORY_SIZE
-    flowInfo.timeDiffs ?= []
-    if flowInfo.messageTime.length > 1
-      flowInfo.timeDiffs.unshift flowInfo.messageTime[0] - flowInfo.messageTime[1]
-    flowInfo.timeDiffs = flowInfo.timeDiffs.slice 0, @CANARY_DATA_HISTORY_SIZE
-    if flowInfo.timeDiffs[0]? and !@passingTimeDiff flowInfo.timeDiffs[0]
-      flowInfo.failures ?= []
-      flowInfo.failures.unshift
-        time: flowInfo.messageTime[1]
-        timeDiff: flowInfo.timeDiffs[0]
-      flowInfo.failures = flowInfo.failures.slice 0, @CANARY_ERROR_HISTORY_SIZE
+    @unshiftData flowInfo, 'messageTime', @Date.now()
+    return if flowInfo.messageTime.length < 2
+    @unshiftData flowInfo, 'timeDiffs', flowInfo.messageTime[0] - flowInfo.messageTime[1]
+    return if @passingTimeDiff flowInfo.timeDiffs[0]
+    @unshiftData flowInfo, 'failures',
+      time: flowInfo.messageTime[1]
+      timeDiff: flowInfo.timeDiffs[0]
+    , @CANARY_ERROR_HISTORY_SIZE
 
   startAllFlows: (callback=->) =>
     @getFlows =>
@@ -137,9 +137,7 @@ class Canary
     async.each @getTriggers(), (trigger, callback) =>
       flowInfo = @stats.flows[trigger.flowId] ?= {}
       triggerInfo = flowInfo.triggerTime ?= {}
-      triggerTime = triggerInfo[trigger.triggerId] ?= []
-      triggerTime.unshift @Date.now()
-      triggerInfo[trigger.triggerId] = triggerTime.slice 0, @CANARY_DATA_HISTORY_SIZE
+      @unshiftData triggerInfo, trigger.triggerId, @Date.now()
       @postTriggerService trigger, => callback()
     , callback
 
@@ -153,16 +151,9 @@ class Canary
         @requestOctobluUrl 'POST', "/api/flows/#{flowUuid}/instance", (error, body) =>
           debug "started #{flowUuid} body: #{body}"
           flowInfo = @stats.flows[flowUuid]
-          flowInfo.startTime ?= []
-          flowInfo.startTime.unshift @Date.now()
-          flowInfo.startTime = flowInfo.startTime.slice 0, @CANARY_DATA_HISTORY_SIZE
+          @unshiftData flowInfo, 'startTime', @Date.now()
           callback()
       , 3000
-
-  addError: (url, body, error) =>
-    @stats.errors ?= []
-    @stats.errors.unshift {url, body, error, time: @Date.now()}
-    @stats.errors = @stats.errors.slice 0, @CANARY_ERROR_HISTORY_SIZE
 
   requestOctobluUrl: (method, path, callback) =>
     url = "#{@OCTOBLU_API_HOST}#{path}"
@@ -179,7 +170,12 @@ class Canary
       urlInfo = "[#{response?.statusCode}] #{options?.method} #{options?.url}"
       debug urlInfo
       if error? or response?.statusCode >= 400
-        @addError urlInfo, body, error?.message
+        @unshiftData @stats, 'errors',
+          url: urlInfo
+          body: body
+          error: error?.message
+          time: @Date.now()
+        , @CANARY_ERROR_HISTORY_SIZE
         return callback new Error urlInfo
       callback null, body
 
