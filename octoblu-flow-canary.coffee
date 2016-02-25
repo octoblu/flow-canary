@@ -11,10 +11,10 @@ cage = new CanaryMessageController
 PORT = process.env.PORT ? 80
 
 app = express()
+app.use meshbluHealthcheck()
 app.use cors()
 app.use morgan 'dev'
 app.use errorHandler()
-app.use meshbluHealthcheck()
 app.use bodyParser.urlencoded limit: '50mb', extended : true
 app.use bodyParser.json limit : '50mb'
 
@@ -32,3 +32,7 @@ startServer = (callback=->) =>
 cage.canary.startAllFlows =>
   startServer =>
     cage.canary.postTriggers()
+
+process.on 'SIGTERM', =>
+  console.log 'SIGTERM caught, exiting'
+  process.exit 0
