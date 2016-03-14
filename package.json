@@ -1,6 +1,6 @@
 {
   "name": "flow-canary",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "Canary service for Octoblu flows",
   "main": "octoblu-flow-canary.js",
   "scripts": {
