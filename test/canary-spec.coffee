@@ -4,6 +4,7 @@ _ = require 'lodash'
 
 API_HOST_PORT     = 0xdead
 TRIGGER_HOST_PORT = 0xbeef
+SLACK_HOST_PORT   = 0xf00d
 
 describe 'Canary', ->
   @timeout 30000
@@ -22,6 +23,7 @@ describe 'Canary', ->
     process.env.OCTOBLU_CANARY_TOKEN = 'canary_token'
     process.env.OCTOBLU_API_HOST     = 'http://localhost:' + API_HOST_PORT
     process.env.OCTOBLU_TRIGGER_HOST = 'http://localhost:' + TRIGGER_HOST_PORT
+    process.env.SLACK_CHANNEL_URL    = 'http://localhost:' + SLACK_HOST_PORT
 
     @CANARY_RESTART_FLOWS_MAX_TIME = process.env.CANARY_RESTART_FLOWS_MAX_TIME = 1000*60
     @CANARY_UPDATE_INTERVAL        = process.env.CANARY_UPDATE_INTERVAL        = 1000*120
@@ -30,6 +32,7 @@ describe 'Canary', ->
 
     @apiHost     = shmock API_HOST_PORT
     @triggerHost = shmock TRIGGER_HOST_PORT
+    @slackHost   = shmock SLACK_HOST_PORT
 
     @flows = [
         flowId: "flow-a"
@@ -55,7 +58,8 @@ describe 'Canary', ->
 
   after (done) ->
     @apiHost.close =>
-      @triggerHost.close done
+      @triggerHost.close =>
+        @slackHost.close done
 
   describe '-> canary', ->
     it 'should have a message endpoint', ->
