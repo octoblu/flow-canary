@@ -50,38 +50,57 @@ class Canary
       @cleanupFlowStats()
       @restartFailedFlows =>
         @postTriggers =>
-          @doSlackNotifications()
-          callback()
+          @doSlackNotifications callback
 
   doSlackNotifications: (callback) =>
     stats = @getCurrentStats()
+    notifications = []
 
     if !@slackNotifications['lastNotify']
       @slackNotifications['lastNotify'] = Date.now()
-      @postSlackNotification attachments: [{color:"good",text:"The flow-canary is alive!"}]
+      notifications.push @curryPostSlackNotification {
+        attachments: [{color:"good",text:"The flow-canary is alive!"}]
+      }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
     if !stats.passing and lastUpdate >= 60*60
       @slackNotifications['lastNotify'] = Date.now()
-      @postSlackNotification attachments: [{color:"danger",text:"Flow-canary is not dead yet!"}]
+      notifications.push @curryPostSlackNotification {
+        icon_emoji: ':skull:'
+        username: 'flow-canary-ded'
+        attachments: [{color:"danger",text:"Flow-canary is sad but not dead yet!"}]
+      }
 
-    _.forIn stats.flows, (flowId, flow) =>
-      @slackNotifications[flowId] ?= false
+    _.forIn stats.flows, (flow, flowId) =>
+      @slackNotifications[flowId] ?= true
 
       if !flow.passing and @slackNotifications[flowId]
+        debug {flowId, flow}
         @slackNotifications[flowId] = false
-        @postSlackNotification attachments: [{color:"danger",text:"Flow #{flow.name} is failing"}]
+        notifications.push @curryPostSlackNotification {
+          icon_emoji: ':skull:'
+          username: 'flow-canary-ded'
+          attachments: [{color:"danger",text:"Flow #{flow.name} (#{flowId}) is failing"}]
+        }
 
       if flow.passing and !@slackNotifications[flowId]
         @slackNotifications[flowId] = true
-        @postSlackNotification attachments: [{color:"good",text:"Flow #{flow.name} is now passing"}]
+        notifications.push @curryPostSlackNotification {
+          attachments: [{color:"good",text:"Flow #{flow.name} (#{flowId}) is now passing"}]
+        }
 
     @slackNotifications['lastError'] ?= 0
     stats.errors ?= []
     _.each stats.errors.reverse(), (errorInfo) =>
       if @slackNotifications['lastError'] < errorInfo.time
         @slackNotifications['lastError'] = errorInfo.time
-        @postSlackNotification attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
+        notifications.push @curryPostSlackNotification {
+          icon_emoji: ':bird:'
+          username: 'flow-canary-wut'
+          attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
+        }
+
+    async.series notifications, callback
 
   unshiftData: (obj, prop, data, trimSize=@CANARY_DATA_HISTORY_SIZE) =>
     obj[prop] ?= []
@@ -177,19 +196,24 @@ class Canary
       @postTriggerService trigger, => callback()
     , callback
 
-  postSlackNotification: (payload)=>
+  curryPostSlackNotification: (payload)=>
     defaultPayload =
-      channel: "#bird-is-the-word",
-      username: "flow-canary",
-      icon_emoji: ":baby_chick:",
+      channel: '#bird-is-the-word'
+      username: 'flow-canary'
+      icon_emoji: ':baby_chick:'
 
     options =
-      uri: @SLACK_CHANNEL_URL,
-      method: 'POST',
-      json: _.merge defaultPayload, payload
+      uri: @SLACK_CHANNEL_URL
+      method: 'POST'
+      body: _.merge defaultPayload, payload
+      json: true
 
-    request options, (error, response, body) =>
-      console.error error if error?
+    return (callback=->) =>
+      debug JSON.stringify options
+      request options, (error, response, body) =>
+        console.error error if error?
+        debug {body}
+        callback()
 
   curryStartFlow: (flowUuid) =>
     return (callback=->) =>
