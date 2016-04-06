@@ -57,14 +57,12 @@ class Canary
     notifications = []
 
     if !@slackNotifications['lastNotify']
-      @slackNotifications['lastNotify'] = Date.now()
       notifications.push @curryPostSlackNotification {
         attachments: [{color:"good",text:"The flow-canary is alive!"}]
       }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
-    if !stats.passing and lastUpdate >= 60*60
-      @slackNotifications['lastNotify'] = Date.now()
+    if !stats.passing and lastUpdate >= 60*60*1000
       notifications.push @curryPostSlackNotification {
         icon_emoji: ':skull:'
         username: 'flow-canary-ded'
@@ -207,6 +205,8 @@ class Canary
       method: 'POST'
       body: _.merge defaultPayload, payload
       json: true
+
+    @slackNotifications['lastNotify'] = Date.now()
 
     return (callback=->) =>
       debug JSON.stringify options
