@@ -19,6 +19,9 @@ class Canary
     @CANARY_DATA_HISTORY_SIZE      = Number.parseInt(process.env.CANARY_DATA_HISTORY_SIZE)      or 5
     @CANARY_ERROR_HISTORY_SIZE     = Number.parseInt(process.env.CANARY_ERROR_HISTORY_SIZE)     or 20
 
+    @SLACK_CHANNEL_URL = process.env.SLACK_CHANNEL_URL
+    throw new Error('SLACK_CHANNEL_URL must be defined') unless @SLACK_CHANNEL_URL
+
     unless @OCTOBLU_CANARY_UUID and @OCTOBLU_CANARY_TOKEN
       throw new Error 'Canary UUID or token not defined'
 
@@ -29,6 +32,7 @@ class Canary
       flows: {}
       startTime: @Date.now()
     @flows = []
+    @slackNotifications = {}
 
     setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
 
@@ -45,7 +49,39 @@ class Canary
     @getFlows =>
       @cleanupFlowStats()
       @restartFailedFlows =>
-        @postTriggers callback
+        @postTriggers =>
+          @doSlackNotifications()
+          callback()
+
+  doSlackNotifications: (callback) =>
+    stats = @getCurrentStats()
+
+    if !@slackNotifications['lastNotify']
+      @slackNotifications['lastNotify'] = Date.now()
+      @postSlackNotification attachments: [{color:"good",text:"The flow-canary is alive!"}]
+
+    lastUpdate = Date.now() - @slackNotifications['lastNotify']
+    if !stats.passing and lastUpdate >= 60*60
+      @slackNotifications['lastNotify'] = Date.now()
+      @postSlackNotification attachments: [{color:"danger",text:"Flow-canary is not dead yet!"}]
+
+    _.forIn stats.flows, (flowId, flow) =>
+      @slackNotifications[flowId] ?= false
+
+      if !flow.passing and @slackNotifications[flowId]
+        @slackNotifications[flowId] = false
+        @postSlackNotification attachments: [{color:"danger",text:"Flow #{flow.name} is failing"}]
+
+      if flow.passing and !@slackNotifications[flowId]
+        @slackNotifications[flowId] = true
+        @postSlackNotification attachments: [{color:"good",text:"Flow #{flow.name} is now passing"}]
+
+    @slackNotifications['lastError'] ?= 0
+    stats.errors ?= []
+    _.each stats.errors.reverse(), (errorInfo) =>
+      if @slackNotifications['lastError'] < errorInfo.time
+        @slackNotifications['lastError'] = errorInfo.time
+        @postSlackNotification attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
 
   unshiftData: (obj, prop, data, trimSize=@CANARY_DATA_HISTORY_SIZE) =>
     obj[prop] ?= []
@@ -140,6 +176,20 @@ class Canary
       @unshiftData triggerInfo, trigger.triggerId, @Date.now()
       @postTriggerService trigger, => callback()
     , callback
+
+  postSlackNotification: (payload)=>
+    defaultPayload =
+      channel: "#bird-is-the-word",
+      username: "flow-canary",
+      icon_emoji: ":baby_chick:",
+
+    options =
+      uri: @SLACK_CHANNEL_URL,
+      method: 'POST',
+      json: _.merge defaultPayload, payload
+
+    request options, (error, response, body) =>
+      console.error error if error?
 
   curryStartFlow: (flowUuid) =>
     return (callback=->) =>

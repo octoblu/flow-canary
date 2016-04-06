@@ -148,7 +148,7 @@ describe 'Canary', ->
 
           it 'should have no errors in stats', ->
             # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
-            expect(@sut.canary.getCurrentStats().errors).to.not.exist
+            expect(_.isEmpty(@sut.canary.getCurrentStats().errors)).to.be.true
 
       describe 'when processUpdateInterval and everything errors', ->
         before (done) ->
