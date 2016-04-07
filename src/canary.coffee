@@ -61,6 +61,17 @@ class Canary
         attachments: [{color:"good",text:"The flow-canary is alive!"}]
       }
 
+    @slackNotifications['lastError'] ?= 0
+    stats.errors ?= []
+    _.each stats.errors.reverse(), (errorInfo) =>
+      if @slackNotifications['lastError'] < errorInfo.time
+        @slackNotifications['lastError'] = errorInfo.time
+        notifications.push @curryPostSlackNotification {
+          icon_emoji: ':bird:'
+          username: 'flow-canary-wut'
+          attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
+        }
+
     _.forIn stats.flows, (flow, flowId) =>
       @slackNotifications[flowId] ?= true
 
@@ -77,17 +88,6 @@ class Canary
         @slackNotifications[flowId] = true
         notifications.push @curryPostSlackNotification {
           attachments: [{color:"good",text:"Flow #{flow.name} (#{flowId}) is now passing"}]
-        }
-
-    @slackNotifications['lastError'] ?= 0
-    stats.errors ?= []
-    _.each stats.errors.reverse(), (errorInfo) =>
-      if @slackNotifications['lastError'] < errorInfo.time
-        @slackNotifications['lastError'] = errorInfo.time
-        notifications.push @curryPostSlackNotification {
-          icon_emoji: ':bird:'
-          username: 'flow-canary-wut'
-          attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
         }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
