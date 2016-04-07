@@ -196,7 +196,6 @@ class Canary
 
   curryPostSlackNotification: (payload)=>
     defaultPayload =
-      channel: '#bird-is-the-word'
       username: 'flow-canary'
       icon_emoji: ':baby_chick:'
 
