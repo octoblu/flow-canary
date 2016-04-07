@@ -61,14 +61,6 @@ class Canary
         attachments: [{color:"good",text:"The flow-canary is alive!"}]
       }
 
-    lastUpdate = Date.now() - @slackNotifications['lastNotify']
-    if !stats.passing and lastUpdate >= 60*60*1000
-      notifications.push @curryPostSlackNotification {
-        icon_emoji: ':skull:'
-        username: 'flow-canary-ded'
-        attachments: [{color:"danger",text:"Flow-canary is sad but not dead yet!"}]
-      }
-
     _.forIn stats.flows, (flow, flowId) =>
       @slackNotifications[flowId] ?= true
 
@@ -97,6 +89,14 @@ class Canary
           username: 'flow-canary-wut'
           attachments: [{color:"warning",text:"Error: #{errorInfo.url}"}]
         }
+
+    lastUpdate = Date.now() - @slackNotifications['lastNotify']
+    if !stats.passing and lastUpdate >= 60*60*1000
+      notifications.push @curryPostSlackNotification {
+        icon_emoji: ':skull:'
+        username: 'flow-canary-ded'
+        attachments: [{color:"danger",text:"Flow-canary is still failing!"}]
+      }
 
     async.series notifications, callback
 
