@@ -57,8 +57,10 @@ class Canary
     notifications = []
 
     if !@slackNotifications['lastNotify']
+      lowerResponseTime = (@CANARY_UPDATE_INTERVAL - @CANARY_HEALTH_CHECK_MAX_DIFF) / 1000
+      upperResponseTime = (@CANARY_UPDATE_INTERVAL + @CANARY_HEALTH_CHECK_MAX_DIFF) / 1000
       notifications.push @curryPostSlackNotification {
-        attachments: [{color:"good",text:"The flow-canary is alive!"}]
+        attachments: [{color:"good",text:"The flow-canary is alive! Expected response time is between #{lowerResponseTime} and #{upperResponseTime} seconds"}]
       }
 
     @slackNotifications['lastError'] ?= 0
@@ -75,14 +77,23 @@ class Canary
     _.forIn stats.flows, (flow, flowId) =>
       @slackNotifications[flowId] ?= true
 
-      if !flow.passing and @slackNotifications[flowId]
-        debug {flowId, flow}
-        @slackNotifications[flowId] = false
-        notifications.push @curryPostSlackNotification {
-          icon_emoji: ':skull:'
-          username: 'flow-canary-ded'
-          attachments: [{color:"danger",text:"Flow #{flow.name} (#{flowId}) is failing"}]
-        }
+      @slackNotifications['lastFailure'] ?= 0
+      flow.failures ?= []
+      _.each flow.failures.reverse(), (errorInfo) =>
+        if @slackNotifications['lastFailure'] < errorInfo.time
+          @slackNotifications['lastFailure'] = errorInfo.time
+          @slackNotifications[flowId] = false
+          timeDiffInSeconds = errorInfo.timeDiff / 1000
+          notifications.push @curryPostSlackNotification {
+            icon_emoji: ':skull:'
+            username: 'flow-canary-ded'
+            attachments: [
+              {
+                color:"danger",
+                text:"Flow #{flow.name} (#{flowId}) failed because it took #{timeDiffInSeconds} seconds to respond"
+              }
+            ]
+          }
 
       if flow.passing and !@slackNotifications[flowId]
         @slackNotifications[flowId] = true
