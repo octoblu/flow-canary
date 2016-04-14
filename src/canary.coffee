@@ -101,25 +101,25 @@ class Canary
           attachments: [{color:"good",text:"Flow #{flow.name} (#{flowId}) is now passing"}]
         }
 
+      if @stats.passing
+        notifications.push @curryPostSlackNotification {
+          attachments: [{color:"good",text:"All flows are now passing"}]
+        }
+      if !@stats.passing
+        failingFlows = ""
+        _.each @stats.flows, (flowInfo) =>
+          if !flowInfo.passing
+            failingFlows += ">#{flowInfo.name}< "
+        notifications.push @curryPostSlackNotification {
+          attachments: [{color:"danger",text:"Flows #{failingFlows}are still failing"}]
+        }
+
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
     if !stats.passing and lastUpdate >= 60*60*1000
       notifications.push @curryPostSlackNotification {
         icon_emoji: ':skull:'
         username: 'flow-canary-ded'
         attachments: [{color:"danger",text:"Flow-canary is still failing!"}]
-      }
-
-    if @stats.passing
-      notifications.push @curryPostSlackNotification {
-        attachments: [{color:"good",text:"All flows are now passing"}]
-      }
-    if !@stats.passing
-      failingFlows = ""
-      _.each @stats.flows, (flowInfo) =>
-        if !flowInfo.passing
-          failingFlows += ">#{flowInfo.name}< "
-      notifications.push @curryPostSlackNotification {
-        attachments: [{color:"danger",text:"Flows #{failingFlows}are still failing"}]
       }
 
     async.series notifications, callback
