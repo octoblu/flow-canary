@@ -102,7 +102,7 @@ class Canary
         }
         if @stats.passing
           notifications.push @curryPostSlackNotification {
-            attachments: [{color:"good",text:"All tests are now passing"}]
+            attachments: [{color:"good",text:"All flows are now passing"}]
           }
         if !@stats.passing
           failingFlows = ""
