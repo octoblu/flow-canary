@@ -100,17 +100,19 @@ class Canary
         notifications.push @curryPostSlackNotification {
           attachments: [{color:"good",text:"Flow #{flow.name} (#{flowId}) is now passing"}]
         }
-        if @stats.passing
+        failingFlows = ""
+        failCount = 0
+        _.each @stats.flows, (flowInfo) =>
+          if !flowInfo.passing
+            failingFlows += ">#{flowInfo.name}< "
+            failCount += 1
+        if failCount == 0
           notifications.push @curryPostSlackNotification {
-            attachments: [{color:"good",text:"All flows are now passing"}]
+            attachments: [{color:"good",text: "All flows are now passing"}]
           }
-        if !@stats.passing
-          failingFlows = ""
-          _.each @stats.flows, (flowInfo) =>
-            if !flowInfo.passing
-              failingFlows += ">#{flowInfo.name}< "
+        else
           notifications.push @curryPostSlackNotification {
-            attachments: [{color:"danger",text:"Flows #{failingFlows}are still failing"}]
+            attachments: [{color:"danger",text:"#{failCount} flows are still failing: #{failingFlows}"}]
           }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
