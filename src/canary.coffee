@@ -212,7 +212,7 @@ class Canary
 
   postTriggers: (callback=->) =>
     debug 'posting triggers'
-    async.eachSeries @getTriggers(), (trigger, callback) =>
+    async.each @getTriggers(), (trigger, callback) =>
       flowInfo = @stats.flows[trigger.flowId] ?= {}
       triggerInfo = flowInfo.triggerTime ?= {}
       @unshiftData triggerInfo, trigger.triggerId, @Date.now()
