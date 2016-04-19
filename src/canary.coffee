@@ -55,6 +55,8 @@ class Canary
   doSlackNotifications: (callback) =>
     stats = @getCurrentStats()
     notifications = []
+    update = false
+    ded = false
 
     if !@slackNotifications['lastNotify']
       lowerResponseTime = (@CANARY_UPDATE_INTERVAL - @CANARY_HEALTH_CHECK_MAX_DIFF) / 1000
@@ -81,6 +83,8 @@ class Canary
       flow.failures ?= []
       _.each flow.failures.reverse(), (errorInfo) =>
         if @slackNotifications['lastFailure'] < errorInfo.time
+          update = true
+          ded = true
           @slackNotifications['lastFailure'] = errorInfo.time
           @slackNotifications[flowId] = false
           timeDiffInSeconds = errorInfo.timeDiff / 1000
@@ -97,22 +101,32 @@ class Canary
 
       if flow.passing and !@slackNotifications[flowId]
         @slackNotifications[flowId] = true
+        update = true
         notifications.push @curryPostSlackNotification {
           attachments: [{color:"good",text:"Flow #{flow.name} (#{flowId}) is now passing"}]
         }
-        failingFlows = ""
-        failCount = 0
-        _.each @stats.flows, (flowInfo) =>
-          if !flowInfo.passing
-            failingFlows += ">#{flowInfo.name}< "
-            failCount += 1
-        if failCount == 0
+
+    if update
+      failingFlows = ""
+      failCount = 0
+      _.each @stats.flows, (flowInfo) =>
+        if !flowInfo.passing
+          failingFlows += ">#{flowInfo.name}< "
+          failCount += 1
+      if failCount == 0
+        notifications.push @curryPostSlackNotification {
+          attachments: [{color:"good",text: "All flows are now passing"}]
+        }
+      else
+        if ded
           notifications.push @curryPostSlackNotification {
-            attachments: [{color:"good",text: "All flows are now passing"}]
+            icon_emoji: ':skull:'
+            username: 'flow-canary-ded'
+            attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
           }
         else
           notifications.push @curryPostSlackNotification {
-            attachments: [{color:"danger",text:"#{failCount} flows are still failing: #{failingFlows}"}]
+            attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
           }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
