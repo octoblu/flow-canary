@@ -1,5 +1,5 @@
 shmock = require 'shmock'
-CanaryMessageController = require '../src/canary-message-controller'
+CanaryMessageController = require '../src/canary/canary-message-controller'
 _ = require 'lodash'
 
 API_HOST_PORT     = 0xdead

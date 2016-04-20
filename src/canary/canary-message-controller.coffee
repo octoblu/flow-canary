@@ -5,14 +5,14 @@ class CanaryMessageController
   constructor: ({@canary,Date}={}) ->
     @canary ?= new Canary {Date}
 
-  getStats: (req, res) =>
-    res.json(@canary.getCurrentStats()).end()
+  postMessage: (req, res) =>
+    res.end()
+    @canary.messageFromFlow req.body?.fromUuid
 
   getPassing: (req, res) =>
     res.json(@canary.getPassing()).end()
 
-  postMessage: (req, res) =>
-    res.end()
-    @canary.messageFromFlow req.body?.fromUuid
+  getStats: (req, res) =>
+    res.json(@canary.getStats()).end()
 
 module.exports = CanaryMessageController

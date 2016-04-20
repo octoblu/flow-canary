@@ -1,6 +1,6 @@
 cors = require 'cors'
 morgan = require 'morgan'
-CanaryMessageController = require './src/canary-message-controller'
+CanaryMessageController = require './src/canary/canary-message-controller'
 express = require 'express'
 bodyParser = require 'body-parser'
 errorHandler = require 'errorhandler'
