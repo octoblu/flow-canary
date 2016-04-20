@@ -6,6 +6,6 @@ class SlackMessageController
     @slack ?= new Slack {@stats,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
 
   sendSlackNotifications: (req, res) =>
-    @slack.doSlackNotifications(req.body?.callback())
+    @slack.doSlackNotifications(req, req.body?.callback())
 
 module.exports = SlackMessageController

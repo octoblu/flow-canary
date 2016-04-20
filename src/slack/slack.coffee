@@ -11,8 +11,7 @@ class Slack
     @SLACK_CHANNEL_URL = process.env.SLACK_CHANNEL_URL
     throw new Error('SLACK_CHANNEL_URL must be defined') unless @SLACK_CHANNEL_URL
 
-  doSlackNotifications: (Stats, callback) =>
-    stats = Stats ?= {}
+  doSlackNotifications: (stats, callback) =>
     notifications = []
     update = false
     ded = false
@@ -68,7 +67,7 @@ class Slack
     if update
       failingFlows = ""
       failCount = 0
-      _.each Stats.flows, (flowInfo) =>
+      _.each stats.flows, (flowInfo) =>
         if !flowInfo.passing
           failingFlows += ">#{flowInfo.name}< "
           failCount += 1

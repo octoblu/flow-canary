@@ -16,6 +16,7 @@ class Canary
     @CANARY_RESTART_FLOWS_MAX_TIME = Number.parseInt(process.env.CANARY_RESTART_FLOWS_MAX_TIME) or 1000*60*5
     @CANARY_UPDATE_INTERVAL        = Number.parseInt(process.env.CANARY_UPDATE_INTERVAL)        or 1000*60
     @CANARY_HEALTH_CHECK_MAX_DIFF  = Number.parseInt(process.env.CANARY_HEALTH_CHECK_MAX_DIFF)  or 1000*2
+    @CANARY_DATA_HISTORY_SIZE      = Number.parseInt(process.env.CANARY_DATA_HISTORY_SIZE)      or 5
     @CANARY_ERROR_HISTORY_SIZE     = Number.parseInt(process.env.CANARY_ERROR_HISTORY_SIZE)     or 20
 
     unless @OCTOBLU_CANARY_UUID and @OCTOBLU_CANARY_TOKEN
@@ -28,7 +29,7 @@ class Canary
     @flows = []
     @Date ?= Date
 
-    @stats = new Stats {@flows,@Date}
+    @stats = new Stats {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
     @slack = new SlackMessageController {@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
 
     setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
@@ -132,12 +133,12 @@ class Canary
       urlInfo = "[#{response?.statusCode}] #{options?.method} #{options?.url}"
       debug urlInfo
       if error? or response?.statusCode >= 400
-        @unshiftData @stats, 'errors',
+        @stats.setCanaryErrors {
           url: urlInfo
           body: body
           error: error?.message
           time: @Date.now()
-        , @CANARY_ERROR_HISTORY_SIZE
+        }, @CANARY_ERROR_HISTORY_SIZE
         return callback new Error urlInfo
       callback null, body
 
