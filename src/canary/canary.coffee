@@ -2,7 +2,7 @@ _ = require 'lodash'
 async = require 'async'
 request = require 'request'
 debug = (require 'debug')('octoblu-flow-canary:canary')
-Stats = require '../stats/stats'
+StatsMessageController = require '../stats/stats-message-controller'
 SlackMessageController = require '../slack/slack-message-controller'
 
 class Canary
@@ -29,7 +29,7 @@ class Canary
     @flows = []
     @Date ?= Date
 
-    @stats = new Stats {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
+    @stats = new StatsMessageController {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
     @slack = new SlackMessageController {@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
 
     setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
