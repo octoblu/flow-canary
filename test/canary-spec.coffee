@@ -1,6 +1,6 @@
+_ = require 'lodash'
 shmock = require 'shmock'
 CanaryMessageController = require '../src/canary/canary-message-controller'
-_ = require 'lodash'
 
 API_HOST_PORT     = 0xdead
 TRIGGER_HOST_PORT = 0xbeef
@@ -10,7 +10,6 @@ describe 'Canary', ->
   @timeout 30000
 
   before ->
-
     @DateMock =
       now: => @time or 0
       setTime: (@time) =>
