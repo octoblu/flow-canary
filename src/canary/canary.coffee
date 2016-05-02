@@ -120,7 +120,8 @@ class Canary
 
   requestOctobluUrl: (method, path, callback) =>
     url = "#{@OCTOBLU_API_HOST}#{path}"
-    @sendRequest {method, url, @jar}, callback
+    headers = deploymentUuid: 'flow-canary-deployment'
+    @sendRequest {headers, method, url, @jar}, callback
 
   postTriggerService: (trigger, callback=->) =>
     url = "#{@OCTOBLU_TRIGGER_HOST}/flows/#{trigger.flowId}/triggers/#{trigger.triggerId}"

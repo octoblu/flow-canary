@@ -10,8 +10,9 @@ class Stats
       startTime: @Date.now()
 
   setCanaryErrors: (error, trimSize) =>
+    @stats.errors ?= []
     @stats.errors.unshift error
-    @stats.errors = @stats.errors slice 0, trimSize
+    @stats.errors = @stats.errors.slice 0, trimSize
 
   setFlowNames: (flow) =>
     @stats.flows[flow.flowId] ?= {}
