@@ -1,7 +1,8 @@
-_ = require 'lodash'
-async = require 'async'
-request = require 'request'
-debug = (require 'debug')('octoblu-flow-canary:canary')
+_                      = require 'lodash'
+uuid                   = require 'uuid'
+async                  = require 'async'
+request                = require 'request'
+debug                  = (require 'debug')('octoblu-flow-canary:canary')
 StatsMessageController = require '../stats/stats-message-controller'
 SlackMessageController = require '../slack/slack-message-controller'
 
@@ -120,7 +121,7 @@ class Canary
 
   requestOctobluUrl: (method, path, callback) =>
     url = "#{@OCTOBLU_API_HOST}#{path}"
-    headers = deploymentUuid: 'flow-canary-deployment'
+    headers = deploymentUuid: "flow-canary-#{uuid.v4()}"
     @sendRequest {headers, method, url, @jar}, callback
 
   postTriggerService: (trigger, callback=->) =>
