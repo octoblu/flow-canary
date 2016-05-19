@@ -3,16 +3,16 @@ debug = (require 'debug')('octoblu-flow-canary:stats')
 
 class Stats
 
-  constructor: ({@Date,@stats,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF} = {}) ->
+  constructor: ({@Date,@stats,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF,@CANARY_ERROR_HISTORY_SIZE} = {}) ->
     @Date ?= Date
     @stats ?=
       flows: {}
       startTime: @Date.now()
 
-  setCanaryErrors: (error, trimSize) =>
+  addCanaryError: (error) =>
     @stats.errors ?= []
     @stats.errors.unshift error
-    @stats.errors = @stats.errors.slice 0, trimSize
+    @stats.errors = @stats.errors.slice 0, @CANARY_ERROR_HISTORY_SIZE
 
   setFlowNames: (flow) =>
     @stats.flows[flow.flowId] ?= {}

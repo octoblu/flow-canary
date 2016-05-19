@@ -20,6 +20,14 @@ class Canary
     @CANARY_DATA_HISTORY_SIZE      = Number.parseInt(process.env.CANARY_DATA_HISTORY_SIZE)      or 5
     @CANARY_ERROR_HISTORY_SIZE     = Number.parseInt(process.env.CANARY_ERROR_HISTORY_SIZE)     or 20
 
+    debug {
+      @CANARY_RESTART_FLOWS_MAX_TIME
+      @CANARY_UPDATE_INTERVAL
+      @CANARY_HEALTH_CHECK_MAX_DIFF
+      @CANARY_DATA_HISTORY_SIZE
+      @CANARY_ERROR_HISTORY_SIZE
+    }
+
     unless @OCTOBLU_CANARY_UUID and @OCTOBLU_CANARY_TOKEN
       throw new Error 'Canary UUID or token not defined'
 
@@ -30,7 +38,7 @@ class Canary
     @flows = []
     @Date ?= Date
 
-    @stats = new StatsMessageController {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
+    @stats = new StatsMessageController {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF,@CANARY_ERROR_HISTORY_SIZE}
     @slack = new SlackMessageController {@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
 
     setInterval @processUpdateInterval, @CANARY_UPDATE_INTERVAL
@@ -135,12 +143,12 @@ class Canary
       urlInfo = "[#{response?.statusCode}] #{options?.method} #{options?.url}"
       debug urlInfo
       if error? or response?.statusCode >= 400
-        @stats.setCanaryErrors {
+        @stats.addCanaryError {
           url: urlInfo
           body: body
           error: error?.message
           time: @Date.now()
-        }, @CANARY_ERROR_HISTORY_SIZE
+        }
         return callback new Error urlInfo
       callback null, body
 
