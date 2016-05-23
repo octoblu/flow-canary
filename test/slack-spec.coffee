@@ -1,7 +1,7 @@
 shmock = require 'shmock'
-SlackMessageController = require '../src/slack/slack-message-controller'
+Slack = require '../src/slack'
 
-SLACK_HOST_PORT   = 0xf00d
+SLACK_HOST_PORT   = 0x51ac
 
 describe 'Slack', ->
   @timeout 30000
@@ -12,7 +12,7 @@ describe 'Slack', ->
     @CANARY_UPDATE_INTERVAL       = process.env.CANARY_UPDATE_INTERVAL       = 1000*120
     @CANARY_HEALTH_CHECK_MAX_DIFF = process.env.CANARY_HEALTH_CHECK_MAX_DIFF = 100
 
-    @sut = new SlackMessageController @CANARY_UPDATE_INTERVAL, @CANARY_HEALTH_CHECK_MAX_DIFF
+    @sut = new Slack @CANARY_UPDATE_INTERVAL, @CANARY_HEALTH_CHECK_MAX_DIFF
 
   after (done) ->
     @slackHost.close done
@@ -22,7 +22,7 @@ describe 'Slack', ->
       expect(@sut.sendSlackNotifications).to.exist
 
     describe 'when sendSlackNotifications is called with a passing flow', ->
-      before ->
+      before (done) ->
         @stats = {
           flows: {
             'fancy-uuid': {
@@ -33,8 +33,9 @@ describe 'Slack', ->
             }
           }
         }
-        sinon.spy(@sut.slack, 'curryPostSlackNotification')
-        @sut.sendSlackNotifications(@stats)
+        sinon.spy(@sut, 'curryPostSlackNotification')
+        @sut.sendSlackNotifications @stats, done
+        @slackPost = @slackHost.post('/slackTest').reply(200)
 
       it 'should call curryPostSlackNotification with passing message', ->
-        expect(@sut.slack.curryPostSlackNotification).to.have.been.called
+        expect(@slackPost.isDone).to.be.true

@@ -11,7 +11,7 @@ class Slack
     @SLACK_CHANNEL_URL = process.env.SLACK_CHANNEL_URL
     throw new Error('SLACK_CHANNEL_URL must be defined') unless @SLACK_CHANNEL_URL
 
-  doSlackNotifications: (stats, callback) =>
+  sendSlackNotifications: (stats, callback) =>
     notifications = []
     update = false
     ded = false
@@ -113,7 +113,7 @@ class Slack
     return (callback=->) =>
       debug JSON.stringify options
       request options, (error, response, body) =>
-        console.error error if error?
+        console.error {error} if error?
         debug {body}
         callback()
 

@@ -1,13 +1,13 @@
 cors = require 'cors'
 morgan = require 'morgan'
-CanaryMessageController = require './src/canary/canary-message-controller'
+MessageController = require './src/message-controller'
 express = require 'express'
 bodyParser = require 'body-parser'
 errorHandler = require 'errorhandler'
 meshbluHealthcheck = require 'express-meshblu-healthcheck'
 debug = (require 'debug')('octoblu-flow-canary:express')
 
-cage = new CanaryMessageController
+cage = new MessageController
 PORT = process.env.PORT ? 80
 
 app = express()
@@ -26,12 +26,13 @@ startServer = (callback=->) =>
   server = app.listen PORT, ->
     host = server.address().address
     port = server.address().port
+
+    cage.canary.startAllFlows =>
+      startServer =>
+        cage.canary.postTriggers()
+
     debug "Server running on #{host}:#{port}"
     callback()
-
-cage.canary.startAllFlows =>
-  startServer =>
-    cage.canary.postTriggers()
 
 process.on 'SIGTERM', =>
   console.log 'SIGTERM caught, exiting'
