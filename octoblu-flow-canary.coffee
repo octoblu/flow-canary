@@ -22,17 +22,13 @@ app.post '/message', cage.postMessage
 app.get '/passing', cage.getPassing
 app.get '/stats', cage.getStats
 
-startServer = (callback=->) =>
-  server = app.listen PORT, ->
-    host = server.address().address
-    port = server.address().port
+server = app.listen PORT, ->
+  host = server.address().address
+  port = server.address().port
 
-    cage.canary.startAllFlows =>
-      startServer =>
-        cage.canary.postTriggers()
-
-    debug "Server running on #{host}:#{port}"
-    callback()
+  cage.canary.startAllFlows =>
+      cage.canary.postTriggers()
+  debug "Server running on #{host}:#{port}"
 
 process.on 'SIGTERM', =>
   console.log 'SIGTERM caught, exiting'
