@@ -9,7 +9,10 @@ class Slack
     @slackNotifications = {}
 
     @SLACK_CHANNEL_URL = process.env.SLACK_CHANNEL_URL
+    @SLACK_EMERGENCY_CHANNEL = process.env.SLACK_EMERGENCY_CHANNEL
+    @SLACK_EMERGENCY_CHANNEL ?= "#performance-problems"
     throw new Error('SLACK_CHANNEL_URL must be defined') unless @SLACK_CHANNEL_URL
+    @startTime = Date.now()
 
   sendSlackNotifications: (stats, callback) =>
     notifications = []
@@ -75,17 +78,22 @@ class Slack
         notifications.push @curryPostSlackNotification {
           attachments: [{color:"good",text: "All flows are now passing"}]
         }
+      if failCount == stats.flows?.length && (Date.now()-@startTime) > 5*60*1000
+        notifications.push @curryPostSlackNotification {
+          icon_emoji: ':skull:'
+          username: 'flow-canary-ded'
+          attachments: [{color:"danger",text: "All flows are failing!"}]
+        }, true
+      else if ded
+        notifications.push @curryPostSlackNotification {
+          icon_emoji: ':skull:'
+          username: 'flow-canary-ded'
+          attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
+        }
       else
-        if ded
-          notifications.push @curryPostSlackNotification {
-            icon_emoji: ':skull:'
-            username: 'flow-canary-ded'
-            attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
-          }
-        else
-          notifications.push @curryPostSlackNotification {
-            attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
-          }
+        notifications.push @curryPostSlackNotification {
+          attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
+        }
 
     lastUpdate = Date.now() - @slackNotifications['lastNotify']
     if !stats.passing and lastUpdate >= 60*60*1000
@@ -97,13 +105,16 @@ class Slack
 
     async.series notifications, callback
 
-  curryPostSlackNotification: (payload)=>
+  curryPostSlackNotification: (payload, emergency)=>
     defaultPayload =
       username: 'flow-canary'
       icon_emoji: ':baby_chick:'
 
+    channel = @SLACK_EMERGENCY_CHANNEL if emergency
+
     options =
       uri: @SLACK_CHANNEL_URL
+      channel: channel
       method: 'POST'
       body: _.merge defaultPayload, payload
       json: true
