@@ -25,6 +25,7 @@ class Slack
       notifications.push @curryPostSlackNotification {
         attachments: [{color:"good",text:"The flow-canary is alive! Expected response time is between #{lowerResponseTime} and #{upperResponseTime} seconds"}]
       }
+      @slackNotifications['lastNotify'] = Date.now()
 
     @slackNotifications['lastError'] ?= 0
     stats.errors ?= []
@@ -60,6 +61,19 @@ class Slack
             ]
           }
 
+      _.each flow.startTime?.reverse(), (lastStart) =>
+        if @slackNotifications['lastNotify'] < lastStart
+          notifications.push @curryPostSlackNotification {
+            icon_emoji: ':skull:'
+            username: 'flow-canary-ded'
+            attachments: [
+              {
+                color:"danger",
+                text:"Flow #{flow.name} (#{flowId}) was restarted at #{new Date(lastStart)}"
+              }
+            ]
+          }
+
       if flow.passing and !@slackNotifications[flowId]
         @slackNotifications[flowId] = true
         update = true
@@ -90,7 +104,7 @@ class Slack
           username: 'flow-canary-ded'
           attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
         }
-      else
+      else if failCount != 0
         notifications.push @curryPostSlackNotification {
           attachments: [{color:"danger",text:"#{failCount} flows are failing: #{failingFlows}"}]
         }
@@ -103,6 +117,7 @@ class Slack
         attachments: [{color:"danger",text:"Flow-canary is still dead!"}]
       }
 
+    @slackNotifications['lastNotify'] = Date.now()
     async.series notifications, callback
 
   curryPostSlackNotification: (payload, emergency)=>
@@ -118,8 +133,6 @@ class Slack
       method: 'POST'
       body: _.merge defaultPayload, payload
       json: true
-
-    @slackNotifications['lastNotify'] = Date.now()
 
     return (callback=->) =>
       debug JSON.stringify options
