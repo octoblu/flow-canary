@@ -139,7 +139,7 @@ describe 'Canary', ->
                 # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
                 expect(@sut.canary.getPassing().passing).to.equal false
 
-              describe 'when processUpdateInterval is called', ->
+              xdescribe 'when processUpdateInterval is called', ->
                 before (done) ->
                   @getFlows = @apiHost.get('/api/flows').reply(200, @flows)
                   @startFlowC = @apiHost.post('/api/flows/flow-c/instance').reply(201)
@@ -160,7 +160,7 @@ describe 'Canary', ->
                   # console.log JSON.stringify @sut.canary.getCurrentStats(), null, 2
                   expect(_.isEmpty(@sut.canary.getStats().errors)).to.be.true
 
-            describe 'when processUpdateInterval and everything errors', ->
+            xdescribe 'when processUpdateInterval and everything errors', ->
               before (done) ->
                 @resetFlowTime 'flow-c', @DateMock.now() - @CANARY_UPDATE_INTERVAL*2
                 @getFlows = @apiHost.get('/api/flows').reply(401, @flows)
