@@ -61,18 +61,18 @@ class Slack
             ]
           }
 
-      _.each flow.startTime?.reverse(), (lastStart) =>
-        if @slackNotifications['lastNotify'] < lastStart
-          notifications.push @curryPostSlackNotification {
-            icon_emoji: ':skull:'
-            username: 'flow-canary-ded'
-            attachments: [
-              {
-                color:"danger",
-                text:"Flow #{flow.name} (#{flowId}) was restarted at #{new Date(lastStart)}"
-              }
-            ]
-          }
+      # _.each flow.startTime?.reverse(), (lastStart) =>
+      #   if @slackNotifications['lastNotify'] < lastStart
+      #     notifications.push @curryPostSlackNotification {
+      #       icon_emoji: ':skull:'
+      #       username: 'flow-canary-ded'
+      #       attachments: [
+      #         {
+      #           color:"danger",
+      #           text:"Flow #{flow.name} (#{flowId}) was restarted at #{new Date(lastStart)}"
+      #         }
+      #       ]
+      #     }
 
       if flow.passing and !@slackNotifications[flowId]
         @slackNotifications[flowId] = true
