@@ -44,9 +44,11 @@ class Canary
   processUpdateInterval: (callback=->) =>
     @getFlows =>
       @stats.cleanupFlowStats(@flows)
-      @restartFailedFlows =>
-        @postTriggers =>
-          @slack.sendSlackNotifications @stats.getCurrentStats(), callback
+      @stats.updateStats()
+
+      # @restartFailedFlows =>
+      @postTriggers =>
+        @slack.sendSlackNotifications @stats.getCurrentStats(), callback
 
   messageFromFlow: (flowId) =>
     flowInfo = @stats.getFlowById(flowId)
@@ -87,7 +89,6 @@ class Canary
 
   restartFailedFlows: (callback=->) =>
     debug 'restarting failed flows'
-    @stats.updateStats()
     flowStarters = []
     _.each _.keys(@stats.getFlows()), (flowUuid) =>
       flowInfo = @stats.getFlowById(flowUuid)
