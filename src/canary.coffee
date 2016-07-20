@@ -50,9 +50,11 @@ class Canary
       @postTriggers =>
         @slack.sendSlackNotifications @stats.getCurrentStats(), callback
 
-  messageFromFlow: (flowId) =>
+  messageFromFlow: (message) =>
+    {flowId} = message
     flowInfo = @stats.getFlowById(flowId)
     @unshiftData flowInfo, 'messageTime', @Date.now()
+    @unshiftData flowInfo, 'messages', message
     return if flowInfo.messageTime.length < 2
     @unshiftData flowInfo, 'timeDiffs', flowInfo.messageTime[0] - flowInfo.messageTime[1]
     return if @stats.passingTimeDiff flowInfo.timeDiffs[0]

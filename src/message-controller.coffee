@@ -7,7 +7,7 @@ class MessageController
 
   postMessage: (req, res) =>
     res.end()
-    @canary.messageFromFlow req.body?.fromUuid
+    @canary.messageFromFlow req.body
 
   getPassing: (req, res) =>
     res.json(@canary.getPassing()).end()
