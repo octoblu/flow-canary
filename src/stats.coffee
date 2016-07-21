@@ -19,6 +19,7 @@ class Stats
     @stats.flows[flow.flowId].name = flow.name
 
   getFlowById: (flowId) =>
+    @stats.flows[flowId] ?= {}
     return @stats.flows[flowId]
 
   getFlows: =>

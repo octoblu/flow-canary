@@ -51,7 +51,7 @@ class Canary
         @slack.sendSlackNotifications @stats.getCurrentStats(), callback
 
   messageFromFlow: (message) =>
-    {flowId} = message
+    flowId = message.fromUuid
     flowInfo = @stats.getFlowById(flowId)
     @unshiftData flowInfo, 'messageTime', @Date.now()
     @unshiftData flowInfo, 'messages', message

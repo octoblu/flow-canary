@@ -108,7 +108,7 @@ describe 'Canary', ->
         it 'should be in a failing state', ->
           expect(@sut.canary.getPassing().passing).to.equal false
 
-        describe 'and we message them a bunch', ->
+        describe.only 'and we message them a bunch', ->
           before ->
             messageCanary = =>
               @DateMock.inc @CANARY_UPDATE_INTERVAL
