@@ -1,19 +1,29 @@
-cors = require 'cors'
-morgan = require 'morgan'
-MessageController = require './src/message-controller'
-express = require 'express'
-bodyParser = require 'body-parser'
-errorHandler = require 'errorhandler'
+cors               = require 'cors'
+morgan             = require 'morgan'
+MessageController  = require './src/message-controller'
+express            = require 'express'
+bodyParser         = require 'body-parser'
+errorHandler       = require 'errorhandler'
 meshbluHealthcheck = require 'express-meshblu-healthcheck'
-debug = (require 'debug')('octoblu-flow-canary:express')
+debug              = (require 'debug')('octoblu-flow-canary:express')
+expressVersion     = require 'express-package-version'
+compression        = require 'compression'
+OctobluRaven       = require 'octoblu-raven'
 
 cage = new MessageController
 PORT = process.env.PORT ? 80
+octobluRaven = new OctobluRaven
+octobluRaven.patchGlobal()
 
 app = express()
+app.use compression()
+app.use @octobluRaven.express().handleErrors()
 app.use meshbluHealthcheck()
+app.use expressVersion(format: '{"version": "%s"}')
 app.use cors()
-app.use morgan 'dev'
+skip = (request, response) =>
+  return response.statusCode < 400
+app.use morgan 'dev', {immediate: false, skip}
 app.use errorHandler()
 app.use bodyParser.urlencoded limit: '50mb', extended : true
 app.use bodyParser.json limit : '50mb'
@@ -26,8 +36,6 @@ server = app.listen PORT, ->
   host = server.address().address
   port = server.address().port
 
-  cage.canary.startAllFlows =>
-      cage.canary.postTriggers()
   debug "Server running on #{host}:#{port}"
 
 process.on 'SIGTERM', =>
