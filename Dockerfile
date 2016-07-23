@@ -2,6 +2,7 @@ FROM node
 MAINTAINER Octoblu, Inc. <docker@octoblu.com>
 
 EXPOSE 80
+ENV NPM_CONFIG_LOGLEVEL error
 
 WORKDIR /usr/src/app
 
