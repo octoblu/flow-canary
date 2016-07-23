@@ -17,7 +17,7 @@ octobluRaven.patchGlobal()
 
 app = express()
 app.use compression()
-app.use @octobluRaven.express().handleErrors()
+app.use octobluRaven.express().handleErrors()
 app.use meshbluHealthcheck()
 app.use expressVersion(format: '{"version": "%s"}')
 app.use cors()
