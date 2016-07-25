@@ -52,6 +52,7 @@ class Canary
 
   messageFromFlow: (message) =>
     flowId = message.fromUuid
+    return unless flowId?
     flowInfo = @stats.getFlowById(flowId)
     @unshiftData flowInfo, 'messageTime', @Date.now()
     @unshiftData flowInfo, 'messages', message
