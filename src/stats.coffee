@@ -47,7 +47,7 @@ class Stats
     passingCount = _.size passing
     totalCount = _.size @stats.flows
     return unless totalCount > 0
-    passingPercent = Math.floor(passingCount / totalCount) * 100
+    passingPercent = (passingCount / totalCount) * 100
     @stats.passing = passingPercent > 90
 
   cleanupFlowStats: (flows) =>
