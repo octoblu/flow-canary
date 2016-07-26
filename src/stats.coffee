@@ -43,8 +43,12 @@ class Stats
         flowInfo.passing = false if !@passingTimeDiff timeDiff
 
     @stats.passing = _.keys(@stats.flows).length != 0
-    _.each @stats.flows, (flowInfo) =>
-      @stats.passing = false if !flowInfo.passing
+    [passing, failing] = _.partition @stats.flows, passing: true
+    passingCount = _.size passing
+    totalCount = _.size @stats.flows
+    return unless totalCount > 0
+    passingPercent = Math.floor(passingCount / totalCount) * 100
+    @stats.passing = passingPercent > 90
 
   cleanupFlowStats: (flows) =>
     debug 'cleaning up flow stats'
