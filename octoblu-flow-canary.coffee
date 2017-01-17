@@ -2,7 +2,6 @@ MessageController  = require './src/message-controller'
 octobluExpress     = require 'express-octoblu'
 debug              = require('debug')('octoblu-flow-canary:express')
 
-
 cage = new MessageController
 PORT = process.env.PORT ? 80
 

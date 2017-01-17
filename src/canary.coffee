@@ -1,14 +1,14 @@
-debug   = (require 'debug')('octoblu-flow-canary:canary')
-request = require 'request'
-async   = require 'async'
-uuid    = require 'uuid'
-_       = require 'lodash'
-Stats   = require './stats'
-Slack   = require './slack'
+_            = require 'lodash'
+uuid         = require 'uuid'
+async        = require 'async'
+request      = require 'request'
+OctobluRaven = require 'octoblu-raven'
+debug        = require('debug')('octoblu-flow-canary:canary')
+Stats        = require './stats'
+Slack        = require './slack'
 
 class Canary
-
-  constructor: ({@Date,@stats,@slack}={})->
+  constructor: ({@Date,@stats,@slack,@octobluRaven}={})->
     @OCTOBLU_CANARY_UUID  = process.env.OCTOBLU_CANARY_UUID
     @OCTOBLU_CANARY_TOKEN = process.env.OCTOBLU_CANARY_TOKEN
     @OCTOBLU_API_HOST     = process.env.OCTOBLU_API_HOST     or 'https://api.octoblu.com'
@@ -29,6 +29,8 @@ class Canary
 
     @flows = []
     @Date ?= Date
+
+    @octobluRaven = new OctobluRaven
 
     @stats ?= new Stats {@flows,@Date,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
     @slack ?= new Slack {@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF}
@@ -55,6 +57,7 @@ class Canary
           callback null
 
   messageFromFlow: (message) =>
+    debug 'got message from flow', message
     flowId = message.fromUuid
     return unless flowId?
     flowInfo = @stats.getFlowById(flowId)
@@ -148,13 +151,16 @@ class Canary
       urlInfo = "[#{response?.statusCode}] #{options?.method} #{options?.url}"
       debug urlInfo
       if error? or response?.statusCode >= 400
-        @stats.setCanaryErrors {
+        info = {
           url: urlInfo
           body: body
           error: error?.message ? error
           time: @Date.now()
-        }, @CANARY_ERROR_HISTORY_SIZE
-        return callback new Error urlInfo
+        }
+        @stats.setCanaryErrors info, @CANARY_ERROR_HISTORY_SIZE
+        error = new Error urlInfo unless error?
+        error.info = info
+        return @_reportError error, callback
       callback null, body
 
   unshiftData: (obj, prop, data, trimSize=@CANARY_DATA_HISTORY_SIZE) =>
@@ -163,6 +169,7 @@ class Canary
     obj[prop] = obj[prop].slice 0, trimSize
 
   _reportError: (error, callback) =>
+    @octobluRaven?.reportError error
     console.error error?.stack ? error
     callback error
 

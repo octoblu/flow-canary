@@ -1,7 +1,6 @@
 Canary = require './canary'
 
 class MessageController
-
   constructor: ({@canary,Date}={}) ->
     @canary ?= new Canary {Date}
 
