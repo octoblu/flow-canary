@@ -137,7 +137,7 @@ class Slack
     return (callback=->) =>
       debug JSON.stringify options
       request options, (error, response, body) =>
-        console.error {error} if error?
+        console.error 'Slack Error', error if error?
         debug {body}
         callback()
 

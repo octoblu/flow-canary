@@ -2,7 +2,6 @@ _ = require 'lodash'
 debug = (require 'debug')('octoblu-flow-canary:stats')
 
 class Stats
-
   constructor: ({@Date,@stats,@CANARY_UPDATE_INTERVAL,@CANARY_HEALTH_CHECK_MAX_DIFF} = {}) ->
     @Date ?= Date
     @stats ?=

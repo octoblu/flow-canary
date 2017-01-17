@@ -11,7 +11,7 @@ class Canary
   constructor: ({@Date,@stats,@slack}={})->
     @OCTOBLU_CANARY_UUID  = process.env.OCTOBLU_CANARY_UUID
     @OCTOBLU_CANARY_TOKEN = process.env.OCTOBLU_CANARY_TOKEN
-    @OCTOBLU_API_HOST     = process.env.OCTOBLU_API_HOST     or 'https://app.octoblu.com'
+    @OCTOBLU_API_HOST     = process.env.OCTOBLU_API_HOST     or 'https://api.octoblu.com'
     @OCTOBLU_TRIGGER_HOST = process.env.OCTOBLU_TRIGGER_HOST or 'https://triggers.octoblu.com'
 
     @CANARY_RESTART_FLOWS_MAX_TIME = Number.parseInt(process.env.CANARY_RESTART_FLOWS_MAX_TIME) or 1000*60*5
@@ -41,14 +41,18 @@ class Canary
   getPassing: =>
     @stats.getPassing()
 
-  processUpdateInterval: (callback=->) =>
-    @getFlows =>
+  processUpdateInterval: (callback) =>
+    @getFlows (error) =>
+      return @_reportError error, callback if error?
       @stats.cleanupFlowStats(@flows)
       @stats.updateStats()
 
       # @restartFailedFlows =>
-      @postTriggers =>
-        @slack.sendSlackNotifications @stats.getCurrentStats(), callback
+      @postTriggers (error) =>
+        return @_reportError error, callback if error?
+        @slack.sendSlackNotifications @stats.getCurrentStats(), (error) =>
+          return @_reportError error, callback if error?
+          callback null
 
   messageFromFlow: (message) =>
     flowId = message.fromUuid
@@ -64,18 +68,20 @@ class Canary
       timeDiff: flowInfo.timeDiffs[0]
     , @CANARY_ERROR_HISTORY_SIZE
 
-  startAllFlows: (callback=->) =>
-    @getFlows =>
+  startAllFlows: (callback) =>
+    @getFlows (error) =>
+      return callback error if error?
       flowStarters = []
       _.each @flows, (flow) => flowStarters.push @curryStartFlow(flow.flowId)
-      async.series flowStarters, =>
+      async.series flowStarters, (error) =>
+        return callback error if error?
         debug 'all flows started'
         callback()
 
   getFlows: (callback) =>
     @requestOctobluUrl 'GET', '/api/flows', (error, body) =>
       return callback error if error?
-      return callback new Error 'body is undefined' unless body
+      return callback new Error 'body is undefined' if _.isEmpty body
       @flows = JSON.parse body
       _.each @flows, (flow) =>
         @stats.setFlowNames(flow)
@@ -84,13 +90,13 @@ class Canary
   getTriggers: =>
     triggers = []
     _.each @flows, (flow) =>
-      triggerNodes = _.filter flow.nodes, (node) => return node.type == 'operation:trigger'
+      triggerNodes = _.filter flow.nodes, { type: 'operation:trigger' }
       _.each triggerNodes, (node) =>
         triggers.push { flowId: flow.flowId, triggerId: node.id }
         debug " - TRIGGER: #{flow.name} : #{node.name} (#{node.id})"
     return triggers
 
-  restartFailedFlows: (callback=->) =>
+  restartFailedFlows: (callback) =>
     debug 'restarting failed flows'
     flowStarters = []
     _.each _.keys(@stats.getFlows()), (flowUuid) =>
@@ -100,23 +106,26 @@ class Canary
         flowStarters.push @curryStartFlow flowUuid
     async.series flowStarters, callback
 
-  postTriggers: (callback=->) =>
+  postTriggers: (callback) =>
     debug 'posting triggers'
-    async.each @getTriggers(), (trigger, callback) =>
+    async.each @getTriggers(), (trigger, next) =>
       flowInfo = @stats.getFlowById(trigger.flowId)
       triggerInfo = flowInfo.triggerTime ?= {}
       @unshiftData triggerInfo, trigger.triggerId, @Date.now()
-      @postTriggerService trigger, => callback()
+      @postTriggerService trigger, (error) =>
+        console.error error if error?
+        next()
     , callback
 
   curryStartFlow: (flowUuid) =>
-    return (callback=->) =>
+    return (callback) =>
       # FIXME:
       #  Q: Remove the delay - why is it needed?
       #  A: Nanocyte-flow-deploy-service wants love.
       debug "starting #{flowUuid}"
       _.delay =>
         @requestOctobluUrl 'POST', "/api/flows/#{flowUuid}/instance", (error, body) =>
+          return @_reportError error, callback if error?
           debug "started #{flowUuid} body: #{body}"
           flowInfo = @stats.getFlowById(flowUuid)
           @unshiftData flowInfo, 'startTime', @Date.now()
@@ -142,7 +151,7 @@ class Canary
         @stats.setCanaryErrors {
           url: urlInfo
           body: body
-          error: error?.message
+          error: error?.message ? error
           time: @Date.now()
         }, @CANARY_ERROR_HISTORY_SIZE
         return callback new Error urlInfo
@@ -152,5 +161,9 @@ class Canary
     obj[prop] ?= []
     obj[prop].unshift data
     obj[prop] = obj[prop].slice 0, trimSize
+
+  _reportError: (error, callback) =>
+    console.error error?.stack ? error
+    callback error
 
 module.exports = Canary
