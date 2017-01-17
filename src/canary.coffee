@@ -41,7 +41,7 @@ class Canary
   getPassing: =>
     @stats.getPassing()
 
-  processUpdateInterval: (callback) =>
+  processUpdateInterval: (callback=->) =>
     @getFlows (error) =>
       return @_reportError error, callback if error?
       @stats.cleanupFlowStats(@flows)
@@ -137,7 +137,7 @@ class Canary
     headers = deploymentUuid: "flow-canary-#{uuid.v4()}"
     @sendRequest {headers, method, url, @jar}, callback
 
-  postTriggerService: (trigger, callback=->) =>
+  postTriggerService: (trigger, callback) =>
     url = "#{@OCTOBLU_TRIGGER_HOST}/flows/#{trigger.flowId}/triggers/#{trigger.triggerId}"
     @sendRequest {method:'POST', url}, callback
 

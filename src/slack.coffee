@@ -134,7 +134,7 @@ class Slack
       body: _.merge defaultPayload, payload
       json: true
 
-    return (callback=->) =>
+    return (callback) =>
       debug JSON.stringify options
       request options, (error, response, body) =>
         console.error 'Slack Error', error if error?
